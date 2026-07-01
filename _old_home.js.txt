@@ -1,0 +1,5 @@
+  });
+
+  $('#btn-edit-name')?.removeEventListener?.('click', () => {});
+
+  $('#btn-home-back')?.addEventListener('click', () => {

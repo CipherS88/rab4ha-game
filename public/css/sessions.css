@@ -1,0 +1,302 @@
+/* جلسات — بطاقات المقاعد وردهة VIP */
+
+#screen-session-lobby {
+  background: radial-gradient(ellipse at 50% 0%, #1a1528 0%, #0c0a06 55%, #080808 100%);
+  overflow-y: auto;
+  padding-bottom: var(--shell-pad-bottom);
+}
+
+.sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.session-vip-card {
+  background: linear-gradient(155deg, rgba(30, 27, 46, 0.92), rgba(15, 20, 32, 0.95));
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  border-radius: 18px;
+  padding: 14px 14px 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.session-vip-card.countdown {
+  border-color: rgba(251, 191, 36, 0.45);
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.12);
+}
+
+.session-vip-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.session-vip-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.session-vip-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 0.72rem;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+.session-vip-badge {
+  font-size: 0.68rem;
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.session-vip-badge.open { background: rgba(34, 197, 94, 0.18); color: #4ade80; }
+.session-vip-badge.closed { background: rgba(239, 68, 68, 0.18); color: #f87171; }
+.session-vip-badge.countdown { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+
+.session-teams-board {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-team-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.session-vs-pill {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #d4af37;
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  border-radius: 99px;
+  padding: 6px 8px;
+  text-align: center;
+  letter-spacing: 0.05em;
+}
+
+.session-seat {
+  position: relative;
+  min-height: 88px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 12, 22, 0.65);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px 10px;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.session-seat.occupied {
+  border-color: rgba(212, 175, 55, 0.2);
+  background: linear-gradient(180deg, rgba(25, 22, 38, 0.9), rgba(12, 16, 28, 0.85));
+}
+
+.session-seat.empty {
+  border-style: dashed;
+  border-color: rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.session-seat-join {
+  width: 100%;
+  height: 100%;
+  min-height: 72px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #9ca3af;
+  font-family: inherit;
+  transition: color 0.2s, background 0.2s;
+  border-radius: 12px;
+}
+
+.session-seat-join:hover:not(:disabled) {
+  color: #d4af37;
+  background: rgba(212, 175, 55, 0.08);
+}
+
+.session-seat-join:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.session-seat-plus {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px dashed rgba(148, 163, 184, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.session-seat-visual {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 52px;
+  width: 100%;
+}
+
+.session-seat-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(212, 175, 55, 0.35);
+  z-index: 2;
+}
+
+.session-seat-avatar.initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, rgba(212,175,55,0.35), #1a1a1a);
+  color: #e2e8f0;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.session-seat-deck {
+  position: absolute;
+  bottom: 2px;
+  right: calc(50% - 36px);
+  transform: scale(0.72);
+  transform-origin: bottom right;
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.session-seat-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.player-name-with-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-direction: row-reverse;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.player-name-with-star .status-star {
+  font-size: 0.72rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.session-seat-host {
+  font-size: 0.6rem;
+  color: #d4af37;
+  font-weight: 600;
+}
+
+.session-vip-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.session-vip-actions .lobby-btn-sm {
+  margin-top: 0;
+  background: linear-gradient(145deg, #b8860b, #8b6914);
+}
+
+/* ردهة الجلسة */
+.session-lobby-wrap {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.session-lobby-countdown {
+  text-align: center;
+  margin: 8px 0 16px;
+  padding: 16px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(251, 191, 36, 0.12), rgba(180, 130, 20, 0.08));
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.session-lobby-countdown.hidden { display: none; }
+
+.session-countdown-num {
+  display: block;
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #fbbf24;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-countdown-label {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: #fcd34d;
+}
+
+.session-lobby-board {
+  margin-bottom: 16px;
+}
+
+.session-lobby-board .session-teams-board {
+  gap: 10px;
+}
+
+.session-lobby-board .session-seat {
+  min-height: 100px;
+}
+
+#btn-session-start {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #d4af37, #9a7b0a);
+  color: #1a1205;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(212, 175, 55, 0.25);
+}
+
+#btn-session-start.hidden { display: none; }
+
+#btn-session-start:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}

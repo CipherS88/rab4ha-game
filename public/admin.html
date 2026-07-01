@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>لوحة الإدارة</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div id="admin-login" class="admin-screen active">
+    <div class="admin-login-box">
+      <h1>لوحة الإدارة</h1>
+      <p class="sub">دخول الأدمن فقط</p>
+      <form id="admin-login-form">
+        <input type="text" id="admin-user" placeholder="معرّف اللاعب (#FESBZ) أو اسم المستخدم" required autocomplete="username" />
+        <input type="password" id="admin-pass" placeholder="كلمة المرور" required autocomplete="current-password" />
+        <p id="admin-login-error" class="error"></p>
+        <button type="submit">دخول</button>
+      </form>
+      <p class="sub admin-recover-hint">
+        فقدت صلاحية الأدمن؟ من مجلد المشروع:<br />
+        <code>npm run admin:promote -- asd</code>
+      </p>
+    </div>
+  </div>
+
+  <div id="admin-app" class="admin-screen">
+    <header class="admin-header">
+      <h1>لوحة الإدارة</h1>
+      <div class="admin-header-actions">
+        <span id="admin-user-label"></span>
+        <button type="button" id="admin-logout">خروج</button>
+      </div>
+    </header>
+
+    <nav class="admin-nav">
+      <button type="button" class="admin-nav-btn active" data-section="tournaments">البطولات</button>
+      <button type="button" class="admin-nav-btn" data-section="sessions">الجلسات</button>
+      <button type="button" class="admin-nav-btn" data-section="store">المتجر</button>
+      <button type="button" class="admin-nav-btn" data-section="users">المستخدمون</button>
+      <button type="button" class="admin-nav-btn" data-section="online">المتصلون</button>
+      <button type="button" class="admin-nav-btn" data-section="chat">تبليغات الشات</button>
+      <button type="button" class="admin-nav-btn" data-section="banned">المحظورون</button>
+    </nav>
+
+    <main class="admin-main">
+      <!-- Pro Tournaments -->
+      <section id="section-tournaments" class="admin-section active">
+        <div class="section-toolbar">
+          <h2>كل البطولات</h2>
+          <div class="toolbar-btns">
+            <button type="button" id="btn-close-all-tournaments" class="btn-warn">إغلاق كل المفتوحة</button>
+            <button type="button" id="btn-new-tournament" class="btn-primary">+ بطولة احترافية</button>
+          </div>
+        </div>
+        <div class="store-admin-tabs tournaments-admin-tabs">
+          <button type="button" class="tournament-filter-tab active" data-type="all">الكل</button>
+          <button type="button" class="tournament-filter-tab" data-type="pro">احترافية</button>
+          <button type="button" class="tournament-filter-tab" data-type="casual">ترفيهية</button>
+        </div>
+        <div id="tournaments-admin-list" class="admin-list"></div>
+
+        <div id="tournament-form-modal" class="admin-modal hidden">
+          <div class="admin-modal-box wide">
+            <h3 id="tournament-form-title">بطولة احترافية</h3>
+            <form id="tournament-admin-form" class="admin-form grid-2">
+              <input type="hidden" id="tournament-edit-id" />
+              <label>اسم البطولة<input type="text" id="ta-title" required /></label>
+              <label>الحالة
+                <select id="ta-status">
+                  <option value="registration">تسجيل مفتوح</option>
+                  <option value="active">جارية</option>
+                  <option value="finished">منتهية</option>
+                </select>
+              </label>
+              <label>عدد المشاركين
+                <select id="ta-size">
+                  <option value="8">8</option>
+                  <option value="16">16</option>
+                  <option value="32">32</option>
+                  <option value="64">64</option>
+                </select>
+              </label>
+              <label>نظام المباريات
+                <select id="ta-format">
+                  <option value="bo1">خروج المغلوب — مباراة واحدة</option>
+                  <option value="bo3">أفضل من 3</option>
+                  <option value="elim_bo3_final">خروج + نهائي أفضل من 3</option>
+                </select>
+              </label>
+              <label class="span-2 upload-field">
+                صورة البطولة
+                <input type="file" id="ta-image-file" accept="image/jpeg,image/png,image/webp,image/gif" />
+                <input type="hidden" id="ta-image" />
+                <img id="ta-image-preview" class="upload-preview hidden" alt="" />
+              </label>
+              <label class="span-2 upload-field">
+                بانر البطولة (اختياري)
+                <input type="file" id="ta-banner-file" accept="image/jpeg,image/png,image/webp,image/gif" />
+                <input type="hidden" id="ta-banner" />
+                <img id="ta-banner-preview" class="upload-preview banner hidden" alt="" />
+              </label>
+              <label>راعي البطولة<input type="text" id="ta-sponsor" placeholder="اسم الراعي" /></label>
+              <label>رابط الراعي<input type="url" id="ta-sponsor-url" placeholder="https://..." /></label>
+              <div class="form-actions span-2">
+                <button type="button" class="btn-cancel" id="btn-cancel-tournament">إلغاء</button>
+                <button type="submit" class="btn-primary">حفظ</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section id="section-sessions" class="admin-section">
+        <div class="section-toolbar">
+          <h2>كل الجلسات</h2>
+          <div class="toolbar-btns">
+            <button type="button" id="btn-close-all-sessions" class="btn-warn">إغلاق كل الجلسات المفتوحة</button>
+          </div>
+        </div>
+        <div id="sessions-admin-list" class="admin-list"></div>
+      </section>
+
+      <!-- Store -->
+      <section id="section-store" class="admin-section">
+        <div class="section-toolbar">
+          <h2>إدارة المتجر</h2>
+          <button type="button" id="btn-new-product" class="btn-primary">+ منتج جديد</button>
+        </div>
+        <div class="store-admin-tabs">
+          <button type="button" class="store-cat-tab active" data-cat="all">الكل</button>
+          <button type="button" class="store-cat-tab" data-cat="cards">أوراق اللعب</button>
+          <button type="button" class="store-cat-tab" data-cat="session_bg">خلفيات الجلسات</button>
+        </div>
+        <div id="products-admin-list" class="admin-list"></div>
+
+        <div id="product-form-modal" class="admin-modal hidden">
+          <div class="admin-modal-box wide">
+            <h3 id="product-form-title">منتج جديد</h3>
+            <form id="product-admin-form" class="admin-form grid-2">
+              <input type="hidden" id="product-edit-id" />
+              <label>القسم
+                <select id="sp-category" required>
+                  <option value="cards">أوراق اللعب</option>
+                  <option value="session_bg">خلفيات الجلسات</option>
+                </select>
+              </label>
+              <label>اسم المنتج<input type="text" id="sp-name" required /></label>
+              <label class="span-2">الوصف<textarea id="sp-desc" rows="2"></textarea></label>
+              <label class="span-2 upload-field">
+                صورة المنتج
+                <div id="sp-drop-zone" class="asset-drop-zone">
+                  <p>اسحب الصورة هنا أو اضغط «اختيار ملف»</p>
+                  <input type="file" id="sp-image-file" accept="image/jpeg,image/png,image/webp,image/gif" />
+                </div>
+              </label>
+              <p class="sub span-2" id="sp-image-folder-hint">ارفع الصورة (حتى 50 ميجا) — تُنسخ تلقائياً لمجلد الكروت أو الجلسات</p>
+              <div class="span-2">
+                <button type="button" id="btn-refresh-assets" class="btn-secondary">تحديث صور المجلد</button>
+              </div>
+              <div id="sp-asset-gallery" class="asset-gallery span-2"></div>
+              <label>مفتاح الأصل (asset)<input type="text" id="sp-asset" readonly placeholder="يُنشأ تلقائياً عند الرفع" /></label>
+              <div>
+                <img id="sp-image-preview" class="upload-preview hidden" alt="" />
+              </div>
+              <input type="hidden" id="sp-image" />
+              <label>السعر (عملات)<input type="number" id="sp-price" min="0" value="0" /></label>
+              <label class="check-label"><input type="checkbox" id="sp-free" /> مجاني</label>
+              <label class="check-label span-2"><input type="checkbox" id="sp-global-default" /> افتراضي لجميع اللاعبين (ملف واحد — يُعطى للجميع تلقائياً)</label>
+              <label>نوع الملكية
+                <select id="sp-ownership">
+                  <option value="permanent">دائم (شراء للأبد)</option>
+                  <option value="rental">إيجار</option>
+                </select>
+              </label>
+              <label id="sp-rental-wrap">مدة الإيجار
+                <select id="sp-rental-days">
+                  <option value="7">7 أيام</option>
+                  <option value="30">30 يوم</option>
+                </select>
+              </label>
+              <label>حصري لعدد (اتركه فارغ = غير محدود)<input type="number" id="sp-stock" min="1" placeholder="مثال: 100" /></label>
+              <label>ينتهي من المتجر في<input type="datetime-local" id="sp-until" /></label>
+              <label class="check-label span-2"><input type="checkbox" id="sp-active" checked /> ظاهر في المتجر</label>
+              <div class="form-actions span-2">
+                <button type="button" class="btn-cancel" id="btn-cancel-product">إلغاء</button>
+                <button type="submit" class="btn-primary">حفظ</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section id="section-users" class="admin-section">
+        <div class="section-toolbar">
+          <h2>المستخدمون</h2>
+          <button type="button" id="btn-refresh-users" class="btn-primary">تحديث</button>
+        </div>
+        <p class="sub admin-hint">النجمة الصفراء = VIP · الزرقاء = مشهور · الحمراء = أدمن (أولوية للأدمن)</p>
+        <div id="users-admin-list" class="admin-list"></div>
+      </section>
+
+      <section id="section-online" class="admin-section">
+        <div class="section-toolbar">
+          <h2>اللاعبون المتصلون</h2>
+          <button type="button" id="btn-refresh-online" class="btn-primary">تحديث</button>
+        </div>
+        <div id="online-admin-list" class="admin-list"></div>
+        <div id="gift-form-panel" class="admin-gift-panel hidden">
+          <h3>إرسال هدية إلى <span id="gift-target-name"></span></h3>
+          <form id="admin-gift-form" class="admin-form grid-2">
+            <input type="hidden" id="gift-user-id" />
+            <label>عملات 🪙<input type="number" id="gift-coins" min="0" value="0" /></label>
+            <label>جواهر 💎<input type="number" id="gift-gems" min="0" value="0" /></label>
+            <label class="span-2">اشتراك منتج (إيجار)
+              <select id="gift-product">
+                <option value="">— بدون منتج —</option>
+              </select>
+            </label>
+            <label>مدة الاشتراك (أيام)<input type="number" id="gift-rental-days" min="0" value="7" /></label>
+            <label class="span-2">VIP (أيام)<input type="number" id="gift-vip-days" min="0" value="0" placeholder="0 = بدون" /></label>
+            <label class="span-2">رسالة الإهداء
+              <textarea id="gift-message" rows="3" maxlength="200" placeholder="مثال: أهداك اشتراك 7 أيام — من الإدارة"></textarea>
+            </label>
+            <div class="form-actions span-2">
+              <button type="button" class="btn-cancel" id="btn-cancel-gift">إلغاء</button>
+              <button type="submit" class="btn-primary">إرسال الهدية</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="section-chat" class="admin-section">
+        <div class="section-toolbar">
+          <h2>تبليغات الشات</h2>
+          <button type="button" id="btn-refresh-reports" class="btn-primary">تحديث</button>
+        </div>
+        <div id="chat-reports-list" class="admin-list"></div>
+      </section>
+
+      <section id="section-banned" class="admin-section">
+        <div class="section-toolbar">
+          <h2>اللاعبون المحظورون</h2>
+          <button type="button" id="btn-refresh-banned" class="btn-primary">تحديث</button>
+        </div>
+        <div id="banned-users-list" class="admin-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="admin-toast" class="admin-toast"></div>
+  <script src="/js/admin-panel.js"></script>
+</body>
+</html>

@@ -1,0 +1,236 @@
+/* محرّر تخطيط طاولة اللعب */
+
+#game-board.game-custom-layout {
+  position: relative !important;
+}
+
+#game-board.game-custom-layout [data-game-layout-id] {
+  position: absolute !important;
+  margin: 0 !important;
+  z-index: 5;
+}
+
+/* انتقال ناعم للكروت فقط — وليس أزرار سوا/قيد/هدايا/رسائل */
+#game-board.game-custom-layout #my-hand .hand-card-wrap,
+#game-board.game-custom-layout .fan-card {
+  transition:
+    transform 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+    margin 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+    height 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#game-board.game-custom-layout .layout-seat-part {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  pointer-events: none;
+}
+
+#game-board.game-custom-layout [data-game-layout-id*="_avatar"],
+#game-board.game-custom-layout [data-game-layout-id*="_cards"],
+#game-board.game-custom-layout [data-game-layout-id*="_name"],
+#game-board.game-custom-layout [data-game-layout-id*="_gifts"] {
+  overflow: visible !important;
+}
+
+#game-board.game-custom-layout .layout-seat-avatar {
+  overflow: visible;
+  z-index: 12;
+}
+
+#game-board.game-custom-layout .layout-seat-part > * {
+  pointer-events: auto;
+}
+
+#game-board.game-custom-layout .table-center {
+  inset: auto !important;
+}
+
+#game-board.game-custom-layout #floor-card {
+  position: absolute !important;
+  inset: auto !important;
+}
+
+#game-board.game-custom-layout #my-hand,
+#game-board.game-custom-layout #project-bar,
+#game-board.game-custom-layout #bid-buttons {
+  position: absolute !important;
+}
+
+#game-board.game-edit-mode [data-game-layout-id] {
+  outline: 1px dashed rgba(212, 175, 55, 0.55);
+  cursor: grab;
+  touch-action: none;
+}
+
+#game-board.game-edit-mode [data-game-layout-id].layout-dragging {
+  cursor: grabbing;
+  z-index: 50;
+}
+
+.game-layout-resize-handle {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 20px;
+  height: 20px;
+  background: rgba(212, 175, 55, 0.92);
+  border: 1px solid #080808;
+  border-radius: 4px;
+  cursor: nwse-resize;
+  z-index: 60;
+}
+
+.game-layout-rotate-handle {
+  position: absolute;
+  left: 50%;
+  top: -14px;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 22px;
+  background: rgba(240, 201, 106, 0.95);
+  border: 1px solid #080808;
+  border-radius: 50%;
+  cursor: grab;
+  z-index: 60;
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+  color: #080808;
+}
+
+.game-layout-rotate-handle::after {
+  content: '↻';
+}
+
+.btn-game-layout-admin {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 52px;
+  z-index: 120;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  background: rgba(8, 8, 8, 0.88);
+  color: #f0c96a;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.btn-game-sandbox-admin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  margin-inline-start: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  background: rgba(18, 16, 10, 0.95);
+  color: #f0c96a;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#game-sandbox-banner {
+  position: fixed;
+  top: calc(56px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.18);
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  color: #f0c96a;
+  font-size: 0.82rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.game-sandbox-toolbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(18, 16, 10, 0.96);
+  border-top: 1px solid rgba(212, 175, 55, 0.35);
+}
+
+.game-sandbox-toolbar.hidden {
+  display: none !important;
+}
+
+.btn-sandbox-tool {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  background: rgba(8, 8, 8, 0.9);
+  color: #f0c96a;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btn-sandbox-tool.active {
+  background: rgba(212, 175, 55, 0.22);
+  border-color: rgba(212, 175, 55, 0.75);
+}
+
+.game-layout-editor-bar {
+  position: fixed;
+  bottom: calc(72px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(8, 8, 8, 0.94);
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.game-layout-editor-bar button {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  background: #121212;
+  color: #f0c96a;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.game-layout-editor-bar .btn-layout-save {
+  background: linear-gradient(135deg, #8b6914, #d4af37, #f0c96a);
+  color: #080808;
+  border: none;
+}
+
+.game-layout-edit-hint {
+  position: fixed;
+  bottom: calc(130px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 199;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #9ca3af;
+  font-size: 0.78rem;
+}

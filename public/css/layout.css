@@ -1,0 +1,49 @@
+/* تخطيط مشترك — استغلال عرض الشاشة بالكامل */
+
+:root {
+  --bg-dark: #080808;
+  --bg-surface: #121212;
+  --bg-elevated: #1a1a1a;
+  --bg-table: #1e3a2f;
+  --accent: #f0c96a;
+  --gold: #d4af37;
+  --gold-light: #f0c96a;
+  --gold-dim: #8b6914;
+  --border-gold: rgba(212, 175, 55, 0.4);
+  --danger: #ef4444;
+  --success: #22c55e;
+  --text: #f5f5f5;
+  --text-muted: #9ca3af;
+  --screen-gradient: linear-gradient(160deg, #1a1508 0%, #080808 50%, #050505 100%);
+  --btn-primary-gradient: linear-gradient(135deg, #8b6914, #d4af37, #f0c96a);
+  --shell-gutter: clamp(16px, 5vw, 28px);
+  --shell-gap: clamp(16px, 2.8vh, 28px);
+  --shell-pad-top: calc(12px + env(safe-area-inset-top));
+  --shell-pad-bottom: calc(20px + var(--safe-bottom));
+}
+
+/* شاشات عمودية بعرض كامل */
+#screen-home.active,
+#screen-chat.active,
+#screen-ranked.active,
+#screen-settings.active,
+#screen-sessions.active,
+#screen-session-lobby.active,
+#screen-tournaments.active,
+#screen-tournament-detail.active,
+#screen-leaderboards.active,
+#screen-store.active,
+#screen-bag.active,
+#screen-friends.active,
+#screen-login.active {
+  flex-direction: column;
+}
+
+.page-fill {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  padding-left: var(--shell-gutter);
+  padding-right: var(--shell-gutter);
+}

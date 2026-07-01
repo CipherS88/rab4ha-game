@@ -1,0 +1,682 @@
+/* تسجيل الدخول + الجلسات + البطولات */
+
+#screen-login {
+  background: radial-gradient(ellipse at 50% 20%, #1a1508 0%, #0c0a06 60%, #080808 100%);
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.login-wrap {
+  width: 100%;
+  max-width: min(100%, 440px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0 var(--shell-gutter);
+  box-sizing: border-box;
+}
+
+.login-logo {
+  text-align: center;
+  font-size: 3rem;
+}
+
+.login-wrap h1 {
+  text-align: center;
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.login-sub {
+  text-align: center;
+  color: #9ca3af;
+  margin: -8px 0 0;
+  font-size: 0.9rem;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.auth-tab {
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 18, 18, 0.85);
+  color: #9ca3af;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.auth-tab.active {
+  background: linear-gradient(145deg, rgba(212, 175, 55, 0.22), rgba(139, 105, 20, 0.35));
+  border-color: rgba(212, 175, 55, 0.55);
+  color: #e0f2fe;
+}
+
+.auth-panel.hidden { display: none; }
+
+.auth-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-bottom: -4px;
+}
+
+.auth-hint {
+  margin: -4px 0 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.register-success {
+  color: #4ade80;
+  font-size: 0.85rem;
+  text-align: center;
+  line-height: 1.5;
+  min-height: 1.2em;
+}
+
+.dev-quick-logins {
+  margin-top: 8px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.dev-quick-logins summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 8px;
+}
+
+.dev-quick-logins summary::-webkit-details-marker { display: none; }
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-form input {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(15, 23, 42, 0.8);
+  color: #f1f5f9;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.login-form input:focus {
+  outline: none;
+  border-color: #f0c96a;
+}
+
+#btn-login,
+#btn-register {
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #d4af37, #0369a1);
+  color: #fff;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#btn-register {
+  background: linear-gradient(145deg, #f59e0b, #d97706);
+}
+
+.login-error {
+  color: #f87171;
+  font-size: 0.85rem;
+  text-align: center;
+  min-height: 1.2em;
+}
+
+.quick-logins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.quick-login {
+  padding: 8px 14px;
+  border-radius: 99px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(30, 41, 59, 0.6);
+  color: #cbd5e1;
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.quick-login.admin {
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fbbf24;
+}
+
+/* صفحات اللوبي */
+#screen-sessions,
+#screen-tournaments,
+#screen-tournament-detail,
+#screen-leaderboards,
+#screen-store,
+#screen-bag {
+  background: radial-gradient(ellipse at 50% 0%, #1a1a1a 0%, #0c0a06 55%, #080808 100%);
+  overflow-y: auto;
+  padding-bottom: var(--shell-pad-bottom);
+}
+
+.lobby-wrap {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: var(--shell-pad-top) var(--shell-gutter) 32px;
+  box-sizing: border-box;
+}
+
+.lobby-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.lobby-header h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  flex: 1;
+}
+
+.lobby-back {
+  border: none;
+  background: rgba(255,255,255,0.08);
+  color: #e2e8f0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.lobby-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.lobby-tabs button {
+  flex: 1;
+  padding: 10px 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.5);
+  color: #9ca3af;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lobby-tabs button.active {
+  background: rgba(14, 165, 233, 0.2);
+  border-color: rgba(14, 165, 233, 0.45);
+  color: #7dd3fc;
+}
+
+.lobby-create {
+  background: rgba(30, 41, 59, 0.65);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.lobby-create h2 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.lobby-create.hidden { display: none; }
+
+.lobby-field {
+  margin-bottom: 10px;
+}
+
+.lobby-field label {
+  display: block;
+  font-size: 0.78rem;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.lobby-field input,
+.lobby-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(15, 23, 42, 0.7);
+  color: #f1f5f9;
+  font-family: inherit;
+}
+
+.lobby-btn-primary {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #22c55e, #15803d);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.lobby-quota {
+  font-size: 0.82rem;
+  color: #9ca3af;
+  margin-bottom: 12px;
+}
+
+.lobby-type-hint {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  margin: -8px 0 12px;
+}
+
+.lobby-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lobby-card {
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.lobby-card.full { opacity: 0.75; }
+
+.lobby-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.lobby-badge {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 99px;
+  font-weight: 600;
+}
+
+.lobby-badge.open { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+.lobby-badge.closed { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+.lobby-badge.casual { background: rgba(14, 165, 233, 0.2); color: #f0c96a; }
+.lobby-badge.pro { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+
+.lobby-card-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+.lobby-btn-sm {
+  margin-top: 10px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #d4af37;
+  color: #fff;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lobby-loading,
+.lobby-empty,
+.lobby-error {
+  text-align: center;
+  color: #9ca3af;
+  padding: 24px;
+}
+
+.lobby-error { color: #f87171; }
+
+.lobby-toast {
+  position: fixed;
+  bottom: calc(24px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: rgba(15, 23, 42, 0.95);
+  color: #f1f5f9;
+  padding: 12px 24px;
+  border-radius: 99px;
+  font-size: 0.9rem;
+  z-index: 200;
+  opacity: 0;
+  transition: transform 0.3s, opacity 0.3s;
+}
+
+.lobby-toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.home-top-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: -8px;
+}
+
+.home-admin-badge {
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.btn-logout {
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: transparent;
+  color: #9ca3af;
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.champ-count {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #fbbf24;
+  min-width: 1.5em;
+  text-align: center;
+}
+
+/* متجر اللاعب */
+.store-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.store-product-card {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.store-product-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #121212;
+  flex-shrink: 0;
+}
+.store-product-img.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+}
+
+.store-product-info { flex: 1; min-width: 0; }
+.store-product-info strong { display: block; margin-bottom: 4px; }
+.store-product-desc { margin: 0; font-size: 0.78rem; color: #9ca3af; }
+.store-product-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 6px;
+}
+.store-price { color: #fbbf24; font-weight: 700; }
+.store-stock { color: #f87171; }
+.store-buy-btn { flex-shrink: 0; }
+
+.store-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.store-preview-btn { background: #9ca3af !important; }
+.store-owned { color: #4ade80; font-weight: 700; }
+
+/* معاينة المتجر */
+.store-preview-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 16px;
+}
+.store-preview-modal.hidden { display: none; }
+.store-preview-box {
+  background: #1a1a1a;
+  border-radius: 20px;
+  padding: 24px;
+  max-width: min(100%, 520px);
+  width: 100%;
+  position: relative;
+  text-align: center;
+}
+.store-preview-close {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  border: none;
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.store-preview-image-wrap { margin-bottom: 16px; }
+.store-preview-image-wrap.session-bg-wrap {
+  aspect-ratio: 9 / 16;
+  max-height: min(70vh, 560px);
+  max-width: min(100%, 320px);
+  margin-left: auto;
+  margin-right: auto;
+  background: #121212;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.store-preview-img {
+  max-width: 100%;
+  max-height: 220px;
+  border-radius: 12px;
+  object-fit: contain;
+}
+.store-preview-img.session-bg-preview {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+}
+.store-preview-img.placeholder {
+  font-size: 4rem;
+  padding: 32px;
+}
+.store-preview-desc {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  margin: 8px 0 12px;
+}
+.store-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+.store-preview-box .lobby-btn-primary { width: 100%; }
+
+/* الحقيبة */
+.bag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bag-item-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 14px;
+}
+.bag-item-card.achievement { border-color: rgba(251, 191, 36, 0.25); }
+.bag-item-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #121212;
+  flex-shrink: 0;
+}
+.bag-item-img.medal { border-radius: 50%; }
+.bag-item-img.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+}
+.bag-item-info { flex: 1; min-width: 0; }
+.bag-item-info strong { display: block; margin-bottom: 4px; }
+.bag-item-cat { font-size: 0.75rem; color: #9ca3af; display: block; }
+.bag-item-desc { margin: 6px 0 0; font-size: 0.78rem; color: #9ca3af; }
+.bag-tag.equipped { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.35); }
+.bag-equip-btn {
+  margin-top: 8px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.12);
+  color: #93c5fd;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.bag-equip-btn:hover { background: rgba(59, 130, 246, 0.22); }
+.bag-equip-btn.active {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+}
+.bag-equip-btn:disabled { opacity: 0.6; cursor: wait; }
+.bag-tag {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+.bag-tag.default { background: rgba(148,163,184,0.2); color: #cbd5e1; }
+.bag-tag.owned { background: rgba(34,197,94,0.2); color: #4ade80; }
+.bag-tag.rental { background: rgba(14,165,233,0.2); color: #f0c96a; }
+.bag-tag.achievement { background: rgba(251,191,36,0.2); color: #fbbf24; }
+
+/* بطولات احترافية */
+.tournament-card.has-banner { padding: 0; overflow: hidden; }
+.tournament-banner {
+  height: 80px;
+  background-size: cover;
+  background-position: center;
+}
+.tournament-card-body { padding: 14px; }
+.tournament-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  margin-left: 8px;
+}
+.tournament-card .lobby-card-head { align-items: center; }
+.tournament-sponsor {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: #9ca3af;
+}
+.tournament-sponsor a { color: #f0c96a; text-decoration: none; }
+
+/* ردهة الجلسة */
+.session-lobby-wrap { max-width: 520px; margin: 0 auto; }
+.session-lobby-meta { padding: 0 4px 12px; }
+.session-lobby-stake { margin: 0 0 6px; color: #fbbf24; font-weight: 700; }
+.session-lobby-status { margin: 0; color: #9ca3af; font-size: 0.9rem; }
+.session-lobby-members {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.session-member-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.session-member-row.ready { border-color: rgba(34, 197, 94, 0.45); }
+.session-member-ready { font-size: 0.85rem; color: #9ca3af; }
+.session-member-row.ready .session-member-ready { color: #4ade80; }
+.session-lobby-actions { display: flex; flex-direction: column; gap: 10px; }
+.lobby-btn-secondary {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.lobby-card-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }

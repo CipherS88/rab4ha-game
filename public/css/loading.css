@@ -1,0 +1,163 @@
+/* شاشة التحميل — من loading.html (بدون تعديل بصري) */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+
+.loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, #1a1508 0%, #080808 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  transition: opacity 0.8s ease-out, visibility 0.8s;
+  font-family: 'Cairo', sans-serif;
+}
+
+.loading-screen.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loading-screen .bg-glow {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  filter: blur(30px);
+  animation: loadingPulseGlow 4s infinite ease-in-out;
+  pointer-events: none;
+}
+
+.loading-screen .game-title {
+  font-size: 3.5rem;
+  font-weight: 900;
+  margin-bottom: 50px;
+  letter-spacing: 2px;
+  background: linear-gradient(45deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0px 4px 15px rgba(187, 145, 47, 0.3));
+  animation: loadingTitleFloat 3s infinite ease-in-out;
+}
+
+.loading-screen .cards-container {
+  position: relative;
+  width: 200px;
+  height: 150px;
+  perspective: 1000px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.loading-screen .card {
+  position: absolute;
+  width: 75px;
+  height: 115px;
+  background: linear-gradient(135deg, #1f1f1f 0%, #121212 100%);
+  border: 2px solid #c5a059;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 2.2rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(197, 160, 89, 0.2);
+  transform-style: preserve-3d;
+  transform-origin: bottom center;
+  animation: loadingCardOrbit 6s infinite cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.loading-screen .card.spade   { color: #ffffff; animation-delay: 0s; text-shadow: 0 0 10px rgba(255,255,255,0.3); }
+.loading-screen .card.diamond { color: #ef4444; animation-delay: 1.5s; border-color: #ef4444; box-shadow: 0 10px 25px rgba(239, 68, 68, 0.2); }
+.loading-screen .card.club    { color: #c5a059; animation-delay: 3s; }
+.loading-screen .card.heart   { color: #ef4444; animation-delay: 4.5s; border-color: #ef4444; box-shadow: 0 10px 25px rgba(239, 68, 68, 0.2); }
+
+.loading-screen .loading-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 250px;
+}
+
+.loading-screen .loading-text {
+  color: #9ca3af;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  animation: loadingPulseText 1.5s infinite ease-in-out;
+}
+
+.loading-screen .progress-bar-container {
+  width: 100%;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.loading-screen .progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #aa771c, #fcf6ba, #bf953f);
+  box-shadow: 0 0 10px #fcf6ba;
+  border-radius: 10px;
+  animation: loadingSimulateLoading 4s forwards cubic-bezier(0.1, 0.8, 0.2, 1);
+}
+
+@keyframes loadingCardOrbit {
+  0% {
+    transform: rotate(0deg) translateY(0) scale(1) rotateY(0deg);
+    z-index: 1;
+  }
+  25% {
+    transform: rotate(15deg) translateY(-25px) scale(1.1) rotateY(180deg);
+    z-index: 4;
+  }
+  50% {
+    transform: rotate(0deg) translateY(0) scale(1) rotateY(360deg);
+    z-index: 2;
+  }
+  75% {
+    transform: rotate(-15deg) translateY(15px) scale(0.9) rotateY(180deg);
+    z-index: 1;
+  }
+  100% {
+    transform: rotate(0deg) translateY(0) scale(1) rotateY(0deg);
+    z-index: 1;
+  }
+}
+
+@keyframes loadingTitleFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); filter: drop-shadow(0px 8px 25px rgba(187, 145, 47, 0.5)); }
+}
+
+@keyframes loadingPulseGlow {
+  0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+@keyframes loadingPulseText {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; color: #e2e8f0; }
+}
+
+@keyframes loadingSimulateLoading {
+  0% { width: 0%; }
+  20% { width: 35%; }
+  45% { width: 55%; }
+  70% { width: 85%; }
+  100% { width: 100%; }
+}

@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#080808" />
+  <title>ربعها - بلوت</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/loading.css" />
+  <link rel="stylesheet" href="/css/game.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/home.css?v=8" />
+  <link rel="stylesheet" href="/css/home-layout-editor.css" />
+  <link rel="stylesheet" href="/css/game-layout-editor.css" />
+  <link rel="stylesheet" href="/css/lobby.css" />
+  <link rel="stylesheet" href="/css/sessions.css" />
+  <link rel="stylesheet" href="/css/tournament-bracket.css" />
+  <link rel="stylesheet" href="/css/leaderboards.css" />
+  <link rel="stylesheet" href="/css/ranked.css" />
+  <link rel="stylesheet" href="/css/settings.css" />
+  <link rel="stylesheet" href="/css/gifts.css" />
+  <link rel="stylesheet" href="/css/table-gifts.css" />
+  <link rel="stylesheet" href="/css/chat.css" />
+  <link rel="stylesheet" href="/css/nav-bar.css?v=2" />
+  <link rel="stylesheet" href="/css/friends.css" />
+</head>
+<body>
+  <!-- Loading screen -->
+  <div class="loading-screen" id="loadingScreen" aria-live="polite" aria-busy="true">
+    <div class="bg-glow"></div>
+    <h1 class="game-title">رِبْعِهَا</h1>
+    <div class="cards-container">
+      <div class="card spade">♠</div>
+      <div class="card diamond">♦</div>
+      <div class="card club">♣</div>
+      <div class="card heart">♥</div>
+    </div>
+    <div class="loading-status">
+      <span class="loading-text">جاري تحميل مجلس البلوت...</span>
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login / Register -->
+  <div id="screen-login" class="screen active">
+    <div class="login-wrap">
+      <div class="login-logo">🃏</div>
+      <h1>رِبْعِهَا</h1>
+      <p class="login-sub">بلوت أونلاين — سجّل دخولك أو أنشئ حساباً</p>
+
+      <div class="auth-tabs" role="tablist">
+        <button type="button" class="auth-tab active" data-auth-tab="login" role="tab">دخول</button>
+        <button type="button" class="auth-tab" data-auth-tab="register" role="tab">حساب جديد</button>
+      </div>
+
+      <form id="login-form" class="login-form auth-panel active" data-auth-panel="login">
+        <label class="auth-label" for="login-id">معرّف اللاعب</label>
+        <input type="text" id="login-id" placeholder="مثال: K7M3P" autocomplete="username" dir="ltr" maxlength="8" required />
+        <p class="auth-hint">المعرّف من 5 أحرف وأرقام — يُعطى عند إنشاء الحساب</p>
+        <label class="auth-label" for="login-password">كلمة المرور</label>
+        <input type="password" id="login-password" placeholder="كلمة المرور" autocomplete="current-password" required />
+        <p id="login-error" class="login-error"></p>
+        <button type="submit" id="btn-login">دخول</button>
+      </form>
+
+      <form id="register-form" class="login-form auth-panel hidden" data-auth-panel="register">
+        <label class="auth-label" for="register-display-name">اسم العرض</label>
+        <input type="text" id="register-display-name" placeholder="الاسم الظاهر في اللعبة" maxlength="20" required />
+        <label class="auth-label" for="register-password">كلمة المرور</label>
+        <input type="password" id="register-password" placeholder="6 أحرف على الأقل" autocomplete="new-password" minlength="6" required />
+        <label class="auth-label" for="register-password-confirm">تأكيد كلمة المرور</label>
+        <input type="password" id="register-password-confirm" placeholder="أعد كتابة كلمة المرور" autocomplete="new-password" minlength="6" required />
+        <p id="register-error" class="login-error"></p>
+        <p id="register-success" class="register-success hidden"></p>
+        <button type="submit" id="btn-register">إنشاء الحساب</button>
+      </form>
+
+      <details class="dev-quick-logins">
+        <summary>دخول سريع (تجريبي)</summary>
+        <div class="quick-logins">
+          <button type="button" class="quick-login" data-user="1" data-pass="1">لاعب 1</button>
+          <button type="button" class="quick-login" data-user="2" data-pass="2">لاعب 2</button>
+          <button type="button" class="quick-login" data-user="3" data-pass="3">لاعب 3</button>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <!-- Home / Lobby Screen -->
+  <div id="screen-home" class="screen">
+    <div id="home-admin-bar" class="home-admin-bar hidden" aria-label="أدوات الأدمن">
+      <button type="button" id="btn-home-layout-edit" class="btn-home-layout-admin" title="تعديل تخطيط الرئيسية (أدمن)">📐</button>
+      <button type="button" id="btn-admin-game-sandbox" class="btn-game-sandbox-admin" title="فتح طاولة تعديل الواجهة">🎴 ساندبوكس — تعديل الطاولة</button>
+    </div>
+    <div class="home-wrap">
+      <div id="home-layout-canvas" class="home-layout-canvas">
+      <div class="home-top-bar">
+        <button type="button" id="btn-settings" class="btn-settings" data-home-layout-id="settings" title="الإعدادات">⚙️</button>
+      </div>
+
+      <header class="home-header">
+        <div class="home-stats-col" data-home-layout-id="stats">
+          <p class="home-stat-line"><span>فلوس</span> <strong id="home-coins">0</strong></p>
+          <p class="home-stat-line"><span>إعجابات</span> <strong id="home-likes">0</strong></p>
+          <p class="home-stat-line"><span>البطولات</span> <strong id="home-championship-stat">0</strong></p>
+        </div>
+        <div id="home-avatar" class="home-avatar-wrap home-avatar-center" data-home-layout-id="avatar">
+          <button type="button" id="btn-change-avatar" class="home-avatar" title="تغيير صورة العرض">
+            <img id="home-avatar-img" class="home-avatar-img hidden" alt="" />
+            <span id="home-avatar-initial">؟</span>
+          </button>
+          <input type="file" id="home-avatar-input" accept="image/jpeg,image/png,image/webp,image/gif" hidden />
+        </div>
+        <div id="home-profile-deck" class="home-deck-stack home-profile-deck" data-home-layout-id="deck" aria-hidden="true">
+          <span class="home-deck-card"></span>
+          <span class="home-deck-card offset"></span>
+        </div>
+        <div class="home-identity-col" data-home-layout-id="identity">
+          <div class="player-name-row">
+            <h2 id="home-player-name">لاعب</h2>
+            <button type="button" id="btn-edit-name" class="btn-edit-name">✎</button>
+          </div>
+          <p id="home-rank-label" class="home-rank-pill">مبتدئ ♣️</p>
+          <p id="home-player-code" class="home-player-code hidden" title="معرّفك الخاص">#-----</p>
+        </div>
+      </header>
+
+      <section class="home-bento">
+        <button type="button" id="btn-ranked" class="home-card-ranked" data-home-layout-id="ranked">
+          <span class="ranked-suits" aria-hidden="true">
+            <span class="suit s1">♠</span>
+            <span class="suit s2">♥</span>
+            <span class="suit s3">♣</span>
+            <span class="suit s4">♦</span>
+          </span>
+          <span class="home-card-ranked-text">
+            <strong>لعب مصنّف</strong>
+            <small id="home-rank-name">مبتدئ</small>
+          </span>
+        </button>
+
+        <div class="home-cubes-wrap">
+          <div class="home-cubes-grid">
+            <button type="button" id="btn-friendly" class="home-cube" data-home-layout-id="friendly">
+              <span class="cube-icon-wrap"><span class="cube-icon">🤝</span></span>
+              <span class="cube-label">ودّية</span>
+            </button>
+            <button type="button" id="btn-tournaments" class="home-cube home-cube-tournaments locked" data-home-layout-id="tournaments" aria-disabled="true" title="قيد التنفيذ">
+              <span class="trophy-motion" aria-hidden="true">
+                <span class="trophy-card tc1"></span>
+                <span class="trophy-icon">🏆</span>
+                <span class="trophy-card tc2"></span>
+              </span>
+              <span class="cube-label">البطولات</span>
+            </button>
+            <button type="button" id="btn-leaderboards" class="home-cube" data-home-layout-id="leaderboards">
+              <span class="cube-icon-wrap"><span class="cube-icon">📊</span></span>
+              <span class="cube-label">المتصدرين</span>
+            </button>
+            <button type="button" id="btn-sessions" class="home-cube" data-home-layout-id="sessions">
+              <span class="cube-icon-wrap"><span class="cube-icon">👥</span></span>
+              <span class="cube-label">الجلسات</span>
+            </button>
+          </div>
+        </div>
+      </section>
+      </div><!-- /home-layout-canvas -->
+
+      <!-- أزرار مخفية للتوافق -->
+      <button type="button" id="btn-match52" class="hidden" hidden></button>
+      <button type="button" id="btn-solo-home" class="hidden" hidden></button>
+      <span id="home-gems" class="hidden" hidden></span>
+      <span id="home-rank-progress" class="hidden"></span>
+      <span id="home-rank-points" class="hidden"></span>
+      <span id="home-record" class="hidden"></span>
+      <span id="home-sub-suits" class="hidden"></span>
+      <span id="home-championship-count" class="hidden"></span>
+      <svg id="home-radar" class="hidden" viewBox="0 0 280 280"></svg>
+    </div>
+    <div id="home-toast" class="home-toast"></div>
+    <div id="home-layout-edit-hint" class="home-layout-edit-hint hidden">اسحب للتحريك — الزاوية للتكبير</div>
+    <div id="home-layout-editor-bar" class="home-layout-editor-bar hidden">
+      <button type="button" id="btn-home-layout-save" class="btn-layout-save">حفظ</button>
+      <button type="button" id="btn-home-layout-cancel">إلغاء</button>
+      <button type="button" id="btn-home-layout-reset">إعادة ضبط</button>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div id="screen-chat" class="screen">
+    <div class="chat-wrap">
+      <header class="chat-header">
+        <button type="button" id="btn-chat-back" class="lobby-back">← رجوع</button>
+        <h1>الشات</h1>
+      </header>
+      <div class="chat-tabs">
+        <button type="button" class="chat-tab active" data-tab="public">الشات العام</button>
+        <button type="button" class="chat-tab" data-tab="dm">الخاص</button>
+      </div>
+      <p class="chat-hint">الرسائل الخاصة تُحذف تلقائياً بعد 48 ساعة</p>
+
+      <div id="chat-panel-public" class="chat-panel">
+        <div id="chat-public-messages" class="chat-messages"></div>
+        <div id="chat-reply-bar" class="chat-reply-bar hidden">
+          <span id="chat-reply-text"></span>
+          <button type="button" id="btn-chat-reply-cancel">✕</button>
+        </div>
+        <div class="chat-compose">
+          <input type="text" id="chat-input" placeholder="اكتب رسالة..." maxlength="500" />
+          <button type="button" id="btn-chat-send">إرسال</button>
+        </div>
+      </div>
+
+      <div id="chat-panel-dm" class="chat-panel hidden">
+        <div class="dm-layout">
+          <div id="chat-dm-list" class="dm-list"></div>
+          <div id="chat-dm-empty" class="dm-empty">اختر محادثة من القائمة</div>
+          <div id="chat-dm-thread" class="dm-thread hidden">
+            <div class="dm-thread-header">
+              <div id="chat-dm-title" class="chat-msg-name">محادثة</div>
+            </div>
+            <div id="chat-dm-messages" class="chat-messages"></div>
+            <div id="chat-dm-reply-bar" class="chat-reply-bar hidden"></div>
+            <div class="chat-compose">
+              <input type="file" id="chat-dm-image-input" accept="image/*" hidden />
+              <button type="button" id="btn-chat-dm-image" class="btn-chat-icon">📷</button>
+              <input type="text" id="chat-dm-input" placeholder="رسالة خاصة..." maxlength="500" />
+              <button type="button" id="btn-chat-dm-send">إرسال</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="chat-profile-modal" class="chat-modal hidden">
+    <div class="chat-modal-box" style="position:relative">
+      <button type="button" id="btn-chat-profile-close" class="chat-modal-close">✕</button>
+      <div id="chat-profile-avatar" class="chat-profile-avatar">؟</div>
+      <h2 id="chat-profile-name">لاعب</h2>
+      <p id="chat-profile-code" class="chat-profile-code"></p>
+      <p id="chat-profile-rank" class="profile-meta-line"></p>
+      <svg id="chat-profile-radar" class="chat-profile-radar" viewBox="0 0 280 280"></svg>
+      <div class="chat-profile-stats">
+        <div><span class="muted">فوز</span> <strong id="chat-profile-wins">0</strong></div>
+        <div><span class="muted">خسارة</span> <strong id="chat-profile-losses">0</strong></div>
+      </div>
+      <div id="chat-profile-actions" class="chat-profile-actions"></div>
+    </div>
+  </div>
+
+  <!-- Gift receive popup -->
+  <div id="gift-receive-overlay" class="gift-overlay hidden" role="dialog" aria-modal="true">
+    <div class="gift-popup">
+      <div class="gift-popup-top">
+        <span class="gift-box-deco" aria-hidden="true">🎁</span>
+        <div class="gift-avatar-stage">
+          <div id="gift-cards-fan" class="gift-cards-fan"></div>
+          <div id="gift-avatar" class="gift-avatar-ring">؟</div>
+          <span id="gift-star-badge" class="gift-star-badge"></span>
+        </div>
+      </div>
+      <div class="gift-sender-name"><span class="gift-crown">👑</span> <span id="gift-sender-name">لاعب</span></div>
+      <div id="gift-reward-icon" class="gift-reward-icon">🪙</div>
+      <p id="gift-message" class="gift-message">أهداك هدية</p>
+      <div class="gift-actions-row">
+        <button type="button" id="gift-btn-send-back" class="gift-action-btn gift-action-send">
+          <span class="gift-action-ico">🎁</span> إهداء
+        </button>
+        <button type="button" id="gift-btn-like" class="gift-action-btn">
+          <span class="gift-action-ico">❤️</span> معجب
+        </button>
+        <button type="button" id="gift-btn-friend" class="gift-action-btn">
+          <span class="gift-action-ico">👤</span> صديق
+        </button>
+      </div>
+      <button type="button" id="gift-back-btn" class="gift-back-btn">عودة</button>
+    </div>
+  </div>
+
+  <!-- Gift send modal -->
+  <div id="gift-send-overlay" class="gift-send-overlay hidden" role="dialog" aria-modal="true">
+    <div class="gift-send-box">
+      <h3>إرسال هدية</h3>
+      <p class="gift-send-target">إلى: <strong id="gift-send-target-name">لاعب</strong></p>
+      <p id="gift-send-balance" class="gift-send-hint">رصيدك: 0 🪙</p>
+      <div id="gift-send-insufficient" class="gift-send-insufficient hidden" role="alert">
+        <span class="gift-insufficient-x" aria-hidden="true">✕</span>
+        <span id="gift-send-insufficient-text">رصيدك غير كافٍ لإرسال هذه الهدية</span>
+      </div>
+      <div class="gift-send-types">
+        <button type="button" class="gift-type-opt active" data-type="coins">🪙 ذهب</button>
+        <button type="button" class="gift-type-opt" data-type="vip_7d">👑 VIP 7 أيام</button>
+      </div>
+      <div id="gift-send-coins-field" class="gift-send-field">
+        <label for="gift-send-amount">مبلغ الذهب</label>
+        <input type="number" id="gift-send-amount" min="50" step="50" value="100" />
+      </div>
+      <p id="gift-send-vip-hint" class="gift-send-hint hidden"><span id="gift-send-vip-cost">التكلفة: 2500 🪙</span></p>
+      <div class="gift-send-field">
+        <label for="gift-send-message">رسالة على الهدية <span class="gift-send-optional">(اختياري)</span></label>
+        <textarea id="gift-send-message" rows="3" maxlength="200" placeholder="اكتب رسالتك للاعب..."></textarea>
+        <span class="gift-send-char-count"><span id="gift-send-message-len">0</span>/200</span>
+      </div>
+      <div class="gift-send-actions">
+        <button type="button" id="gift-send-cancel" class="gift-send-cancel">إلغاء</button>
+        <button type="button" id="gift-send-confirm" class="gift-send-confirm" disabled>إرسال الهدية</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gift sent success -->
+  <div id="gift-sent-overlay" class="gift-sent-overlay hidden" role="status" aria-live="polite">
+    <div class="gift-sent-popup">
+      <div class="gift-sent-sparkles" aria-hidden="true"></div>
+      <div class="gift-sent-icon-wrap">
+        <span class="gift-sent-icon">🎁</span>
+        <span class="gift-sent-check">✓</span>
+      </div>
+      <h3 class="gift-sent-title">وصلت الهدية!</h3>
+      <p id="gift-sent-message" class="gift-sent-message">تم إيصال هديتك بنجاح إلى اللاعب</p>
+      <p id="gift-sent-target" class="gift-sent-target"></p>
+      <button type="button" id="gift-sent-close" class="gift-sent-close">رائع!</button>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div id="screen-settings" class="screen">
+    <div class="settings-wrap">
+      <header class="settings-header">
+        <button type="button" id="btn-settings-back" class="lobby-back">← رجوع</button>
+        <h1>الإعدادات</h1>
+      </header>
+      <form id="settings-form" class="settings-form">
+        <div class="settings-field">
+          <label for="settings-email">البريد الإلكتروني</label>
+          <input type="email" id="settings-email" placeholder="example@email.com" autocomplete="email" />
+        </div>
+        <div class="settings-field">
+          <label for="settings-phone">رقم الجوال السعودي</label>
+          <input type="tel" id="settings-phone" placeholder="05xxxxxxxx" dir="ltr" />
+          <p class="settings-hint">لتحويل الجوائز المالية عبر تطبيق محفظة برق</p>
+        </div>
+        <button type="submit" class="settings-save">حفظ</button>
+      </form>
+      <button type="button" id="btn-settings-logout" class="settings-logout">خروج</button>
+    </div>
+  </div>
+
+  <!-- Ranked Lobby -->
+  <div id="screen-ranked" class="screen">
+    <div class="ranked-wrap">
+      <header class="ranked-header">
+        <button type="button" id="btn-ranked-back" class="lobby-back">← رجوع</button>
+        <h1>لعب مصنّف</h1>
+      </header>
+      <div class="ranked-rank-track">
+        <div class="ranked-rank-box current">
+          <span class="ranked-rank-label">التصنيف الحالي</span>
+          <strong id="ranked-current-rank">مبتدئ ♣️</strong>
+        </div>
+        <div class="ranked-rank-arrow">→</div>
+        <div class="ranked-rank-box next">
+          <span class="ranked-rank-label">التصنيف القادم</span>
+          <strong id="ranked-next-rank">—</strong>
+        </div>
+      </div>
+      <div class="ranked-progress-block">
+        <div class="ranked-progress-track">
+          <div id="ranked-progress-fill" class="ranked-progress-fill"></div>
+        </div>
+        <p id="ranked-progress-text" class="ranked-progress-text">0 / 100 — باقي 100 للترقية</p>
+      </div>
+      <div class="ranked-radar-wrap">
+        <h2>رادار اللعب</h2>
+        <svg id="ranked-radar" class="ranked-radar" viewBox="0 0 280 280" aria-label="رادار المهارات"></svg>
+      </div>
+      <button type="button" id="btn-ranked-play" class="btn-ranked-play">العب</button>
+    </div>
+  </div>
+
+  <!-- Sessions -->
+  <div id="screen-sessions" class="screen">
+    <div class="lobby-wrap">
+      <header class="lobby-header">
+        <button type="button" id="btn-sessions-back" class="lobby-back">← رجوع</button>
+        <h1>جلسات</h1>
+      </header>
+      <div class="lobby-tabs">
+        <button type="button" class="sessions-tab active" data-tab="open">مفتوحة</button>
+        <button type="button" class="sessions-tab" data-tab="mine">جلساتي</button>
+        <button type="button" class="sessions-tab" data-tab="full">الممتلئة</button>
+      </div>
+      <section class="lobby-create">
+        <h2>إنشاء جلسة</h2>
+        <div class="lobby-field">
+          <label for="session-title">اسم الجلسة</label>
+          <input type="text" id="session-title" placeholder="جلسة بلوت" maxlength="40" />
+        </div>
+        <div class="lobby-field">
+          <label for="session-open">نوع الجلسة</label>
+          <select id="session-open">
+            <option value="1">مفتوحة — أي أحد ينضم</option>
+            <option value="0">مقفلة — بدعوة فقط</option>
+          </select>
+        </div>
+        <div class="lobby-field">
+          <label for="session-stake">القيم (اختياري)</label>
+          <input type="number" id="session-stake" placeholder="0" min="0" max="99999" />
+        </div>
+        <div class="lobby-field">
+          <label for="session-deck">نوع الأوراق من الشنطة</label>
+          <select id="session-deck"><option value="">افتراضي</option></select>
+        </div>
+        <div class="lobby-field">
+          <label for="session-bg">خلفية الجلسة من الشنطة</label>
+          <select id="session-bg"><option value="">افتراضي</option></select>
+        </div>
+        <div class="lobby-field">
+          <label for="session-min-rank">أقل تصنيف للدخول</label>
+          <select id="session-min-rank"></select>
+        </div>
+        <button type="button" id="btn-create-session" class="lobby-btn-primary">إنشاء جلسة</button>
+      </section>
+      <div id="sessions-list" class="lobby-list"></div>
+    </div>
+    <div id="lobby-toast" class="lobby-toast"></div>
+  </div>
+
+  <!-- Session Lobby -->
+  <div id="screen-session-lobby" class="screen">
+    <div class="lobby-wrap session-lobby-wrap">
+      <header class="lobby-header">
+        <button type="button" id="btn-session-lobby-back" class="lobby-back">← رجوع</button>
+        <h1 id="session-lobby-title">جلسة</h1>
+      </header>
+      <div class="session-lobby-meta">
+        <p id="session-lobby-stake" class="session-lobby-stake"></p>
+        <p id="session-lobby-status" class="session-lobby-status">بانتظار اللاعبين...</p>
+      </div>
+      <div id="session-lobby-countdown" class="session-lobby-countdown hidden" aria-live="polite">
+        <span id="session-countdown-num" class="session-countdown-num">5</span>
+        <span class="session-countdown-label">ثوانٍ حتى بدء المباراة</span>
+      </div>
+      <div id="session-lobby-board" class="session-lobby-board"></div>
+      <div class="session-lobby-actions">
+        <button type="button" id="btn-session-start" class="hidden">بدء المباراة</button>
+        <button type="button" id="btn-session-leave" class="lobby-btn-secondary">مغادرة الجلسة</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tournaments -->
+  <div id="screen-tournaments" class="screen">
+    <div class="lobby-wrap">
+      <header class="lobby-header">
+        <button type="button" id="btn-tournaments-back" class="lobby-back">← رجوع</button>
+        <h1>بطولات</h1>
+      </header>
+      <div class="lobby-tabs">
+        <button type="button" class="tournaments-tab active" data-tab="casual">ترفيهية</button>
+        <button type="button" class="tournaments-tab" data-tab="pro">احترافية</button>
+      </div>
+      <p id="tournament-type-hint" class="lobby-type-hint">بطولة ترفيهية — الفائز يحصل على شارة في حقيبته</p>
+      <section id="tournament-create-panel" class="lobby-create">
+        <p id="tournament-quota" class="lobby-quota"></p>
+        <h2>إنشاء بطولة</h2>
+        <div class="lobby-field">
+          <label for="tournament-title">اسم البطولة</label>
+          <input type="text" id="tournament-title" placeholder="بطولة بلوت" maxlength="50" />
+        </div>
+        <div class="lobby-field">
+          <label for="tournament-size">عدد المشاركين</label>
+          <select id="tournament-size">
+            <option value="8">8 لاعبين</option>
+            <option value="16">16 لاعب</option>
+            <option value="32">32 لاعب</option>
+            <option value="64">64 لاعب</option>
+          </select>
+        </div>
+        <div class="lobby-field">
+          <label for="tournament-format">نظام المباريات</label>
+          <select id="tournament-format">
+            <option value="bo1">خروج المغلوب — مباراة واحدة</option>
+            <option value="bo3">أفضل من 3 (فوزين من 3)</option>
+            <option value="elim_bo3_final">خروج المغلوب — النهائي أفضل من 3</option>
+          </select>
+        </div>
+        <button type="button" id="btn-create-tournament" class="lobby-btn-primary">إنشاء بطولة</button>
+      </section>
+      <div id="tournaments-list" class="lobby-list"></div>
+    </div>
+  </div>
+
+  <!-- Tournament detail / lobby / bracket -->
+  <div id="screen-tournament-detail" class="screen">
+    <div class="lobby-wrap tournament-detail-wrap">
+      <header class="lobby-header">
+        <button type="button" id="btn-tournament-detail-back" class="lobby-back">← رجوع</button>
+        <h1 id="tournament-detail-title">البطولة</h1>
+      </header>
+      <div id="tournament-detail-root"></div>
+    </div>
+  </div>
+
+  <!-- Leaderboards -->
+  <div id="screen-leaderboards" class="screen">
+    <div class="lobby-wrap leaderboards-wrap">
+      <header class="lobby-header">
+        <button type="button" id="btn-leaderboards-back" class="lobby-back">← رجوع</button>
+        <h1>المتصدرين</h1>
+      </header>
+      <div class="leaderboards-tabs">
+        <button type="button" class="leaderboards-tab active" data-tab="rank_kings">ملوك التصنيف</button>
+        <button type="button" class="leaderboards-tab" data-tab="tournament_stars">البطولات</button>
+        <button type="button" class="leaderboards-tab" data-tab="charisma">الكاريزما</button>
+      </div>
+      <p id="leaderboards-hint" class="leaderboards-hint"></p>
+      <div id="leaderboards-my-rank" class="leaderboards-my-rank hidden"></div>
+      <div id="leaderboards-list" class="leaderboards-list"></div>
+      <p class="leaderboards-live"><span class="live-dot"></span> تحديث مباشر</p>
+    </div>
+  </div>
+
+  <!-- Store -->
+  <div id="screen-store" class="screen">
+    <div class="lobby-wrap">
+      <header class="lobby-header">
+        <button type="button" id="btn-store-back" class="lobby-back">← رجوع</button>
+        <h1>المتجر</h1>
+      </header>
+      <div class="lobby-tabs">
+        <button type="button" class="store-tab active" data-tab="cards">أوراق اللعب</button>
+        <button type="button" class="store-tab" data-tab="session_bg">خلفيات الجلسات</button>
+      </div>
+      <p id="store-type-hint" class="lobby-type-hint">أوراق اللعب — شراء دائم للأبد</p>
+      <div id="store-list" class="store-list"></div>
+    </div>
+    <div id="store-preview-modal" class="store-preview-modal hidden">
+      <div class="store-preview-box">
+        <button type="button" id="store-preview-close" class="store-preview-close">✕</button>
+        <div id="store-preview-image-wrap" class="store-preview-image-wrap"></div>
+        <h2 id="store-preview-title"></h2>
+        <p id="store-preview-desc" class="store-preview-desc"></p>
+        <div id="store-preview-meta" class="store-preview-meta"></div>
+        <button type="button" id="store-preview-buy" class="lobby-btn-primary">شراء</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Friends -->
+  <div id="screen-friends" class="screen">
+    <div class="friends-wrap">
+      <header class="lobby-header">
+        <button type="button" id="btn-friends-back" class="lobby-back">← رجوع</button>
+        <h1>الأصدقاء</h1>
+      </header>
+      <section class="friends-section">
+        <h2>طلبات واردة</h2>
+        <div id="friends-pending" class="friends-list"></div>
+      </section>
+      <section class="friends-section">
+        <h2>أصدقائي</h2>
+        <div id="friends-list" class="friends-list"></div>
+      </section>
+      <section class="friends-section">
+        <h2>طلبات مرسلة</h2>
+        <div id="friends-sent" class="friends-list"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Bag -->
+  <div id="screen-bag" class="screen">
+    <div class="lobby-wrap">
+      <header class="lobby-header">
+        <button type="button" id="btn-bag-back" class="lobby-back">← رجوع</button>
+        <h1>الحقيبة</h1>
+      </header>
+      <div class="lobby-tabs">
+        <button type="button" class="bag-tab active" data-tab="store">من المتجر</button>
+        <button type="button" class="bag-tab" data-tab="achievements">الإنجازات</button>
+      </div>
+      <div id="bag-list" class="bag-list"></div>
+    </div>
+  </div>
+
+  <!-- Name Screen (fallback) -->
+  <div id="screen-name" class="screen">
+    <div class="name-container">
+      <div class="logo">🃏</div>
+      <h1>بلوت</h1>
+      <p class="subtitle">لعبة البلوت السعودية</p>
+      <input type="text" id="player-name" placeholder="أدخل اسمك..." maxlength="20" autocomplete="off" />
+      <button id="btn-start" class="btn-primary">ابدأ اللعب (4 لاعبين)</button>
+      <button id="btn-solo" class="btn-secondary">تجربة فردية — العب لحالك</button>
+      <p class="hint">للتجربة: زر «تجربة فردية» أو افتح <code>?solo=1</code></p>
+      <p class="hint subtle">للعب الحقيقي: افتح 4 نوافذ <code>?seat=0</code> … <code>?seat=3</code></p>
+    </div>
+  </div>
+
+  <!-- Matchmaking Screen -->
+  <div id="screen-matchmaking" class="screen">
+    <div class="match-container" id="matchmaking-panel">
+      <div class="spinner"></div>
+      <h2 id="matchmaking-title">جاري البحث عن لاعبين...</h2>
+      <p id="matchmaking-sub" class="matchmaking-sub">بانتظار اكتمال 4 لاعبين</p>
+      <div id="matchmaking-count" class="matchmaking-count">1 / 4</div>
+      <div id="seats-preview" class="seats-preview"></div>
+      <button type="button" id="btn-cancel-match" class="btn-secondary match-cancel">إلغاء</button>
+      <button id="btn-fill-bots" class="btn-secondary hidden">اختبار مع بوتات (اختياري)</button>
+      <p class="hint match-dev-hint">افتح 4 نوافذ: <code>?seat=0</code> … <code>?seat=3</code></p>
+    </div>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="screen-game" class="screen">
+    <div id="game-sandbox-banner" class="hidden">وضع تعديل الواجهة — بدون لعب أو مؤقت</div>
+    <div id="game-sandbox-toolbar" class="game-sandbox-toolbar hidden">
+      <button type="button" id="btn-sandbox-toggle-edit" class="btn-sandbox-tool">📐 تفعيل الأدوات</button>
+      <button type="button" id="btn-sandbox-cards-5" class="btn-sandbox-tool">5 كروت</button>
+      <button type="button" id="btn-sandbox-cards-6" class="btn-sandbox-tool">6 كروت</button>
+      <button type="button" id="btn-sandbox-cards-7" class="btn-sandbox-tool">7 كروت</button>
+      <button type="button" id="btn-sandbox-cards-8" class="btn-sandbox-tool active">8 كروت</button>
+      <button type="button" id="btn-sandbox-save" class="btn-sandbox-tool active">💾 حفظ</button>
+      <button type="button" id="btn-sandbox-show-projects" class="btn-sandbox-tool active">المشاريع</button>
+      <button type="button" id="btn-sandbox-show-bids" class="btn-sandbox-tool active">المزايدة</button>
+    </div>
+    <button type="button" id="btn-game-layout-edit" class="btn-game-layout-admin hidden" title="تعديل تخطيط الطاولة">📐</button>
+    <div id="game-layout-edit-hint" class="game-layout-edit-hint hidden">اسحب للتحريك · الزاوية للتكبير · ↻ للدوران</div>
+    <div id="game-layout-editor-bar" class="game-layout-editor-bar hidden">
+      <button type="button" id="btn-game-layout-save" class="btn-layout-save">حفظ</button>
+      <button type="button" id="btn-game-layout-cancel">إلغاء</button>
+      <button type="button" id="btn-game-layout-reset">إعادة ضبط</button>
+    </div>
+    <div id="game-board">
+      <div id="room-bg" class="room-bg"></div>
+      <header class="game-header" data-game-layout-id="score_bar">
+        <button type="button" id="btn-leave-game" class="btn-leave-game" title="خروج">✕</button>
+        <button type="button" id="btn-quick-chat" class="btn-quick-chat" title="رسائل سريعة" aria-label="رسائل سريعة">
+          <svg class="btn-quick-chat-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h3l4 4 4-4h5c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+          </svg>
+        </button>
+        <button type="button" id="btn-table-gifts" class="btn-table-gifts" title="إرسال هدية" aria-label="إرسال هدية">🎁</button>
+        <div class="scores-compact">
+          <div class="score-pill us">
+            <span class="score-label">لنا</span>
+            <strong id="score-us">0</strong>
+          </div>
+          <span class="phase-label" id="phase-label">شراء</span>
+          <div class="score-pill them">
+            <span class="score-label">لهم</span>
+            <strong id="score-them">0</strong>
+          </div>
+        </div>
+      </header>
+
+      <div id="project-spreads"></div>
+      <div id="sawa-spreads"></div>
+      <div id="sawa-objection-banner" class="sawa-objection-banner hidden"></div>
+
+      <!-- Player seats — أجزاء منفصلة حسب التخطيط المحفوظ -->
+      <div class="layout-seat-part" data-game-layout-id="seat_top_cards">
+        <div class="opponent-hand fan-hand"></div>
+      </div>
+      <div class="layout-seat-part layout-seat-avatar seat-top" data-game-layout-id="seat_top_avatar">
+        <div class="avatar-wrap">
+          <span class="deck-glow-ring" aria-hidden="true"></span>
+          <div class="timer-ring"></div>
+          <div class="avatar"></div>
+          <span class="dealer-badge hidden">موزع</span>
+          <span class="bid-badge hidden"></span>
+        </div>
+        <div class="chat-bubble hidden"></div>
+      </div>
+      <div class="layout-seat-part" data-game-layout-id="seat_top_gifts">
+        <div class="table-gift-slots" aria-hidden="true">
+          <span class="table-gift-slot empty"></span>
+          <span class="table-gift-slot empty"></span>
+          <span class="table-gift-slot empty"></span>
+        </div>
+      </div>
+      <div class="layout-seat-part" data-game-layout-id="seat_top_name">
+        <div class="player-name-stack">
+          <div class="player-name-badge">
+            <span class="player-name"></span>
+            <span class="status-star hidden" aria-hidden="true">★</span>
+          </div>
+          <span class="player-rank-pill hidden"></span>
+        </div>
+      </div>
+
+      <div class="layout-seat-part" data-game-layout-id="seat_left_cards">
+        <div class="opponent-hand fan-hand"></div>
+      </div>
+      <div class="layout-seat-part layout-seat-avatar seat-left" data-game-layout-id="seat_left_avatar">
+        <div class="avatar-wrap">
+          <span class="deck-glow-ring" aria-hidden="true"></span>
+          <div class="timer-ring"></div>
+          <div class="avatar"></div>
+          <span class="dealer-badge hidden">موزع</span>
+          <span class="bid-badge hidden"></span>
+        </div>
+        <div class="chat-bubble hidden"></div>
+      </div>
+      <div class="layout-seat-part" data-game-layout-id="seat_left_gifts">
+        <div class="table-gift-slots" aria-hidden="true">
+          <span class="table-gift-slot empty"></span>
+          <span class="table-gift-slot empty"></span>
+          <span class="table-gift-slot empty"></span>
+        </div>
+      </div>
+      <div class="layout-seat-part" data-game-layout-id="seat_left_name">
+        <div class="player-name-stack">
+          <div class="player-name-badge">
+            <span class="player-name"></span>
+            <span class="status-star hidden" aria-hidden="true">★</span>
+          </div>
+          <span class="player-rank-pill hidden"></span>
+        </div>
+      </div>
+
+      <div class="layout-seat-part" data-game-layout-id="seat_right_cards">
+        <div class="opponent-hand fan-hand"></div>
+      </div>
+      <div class="layout-seat-part layout-seat-avatar seat-right" data-game-layout-id="seat_right_avatar">
+        <div class="avatar-wrap">
+          <span class="deck-glow-ring" aria-hidden="true"></span>
+          <div class="timer-ring"></div>
+          <div class="avatar"></div>
+          <span class="dealer-badge hidden">موزع</span>
+          <span class="bid-badge hidden"></span>
+        </div>
+        <div class="chat-bubble hidden"></div>
+      </div>
+      <div class="layout-seat-part" data-game-layout-id="seat_right_gifts">
+        <div class="table-gift-slots" aria-hidden="true">
+          <span class="table-gift-slot empty"></span>
+          <span class="table-gift-slot empty"></span>
+          <span class="table-gift-slot empty"></span>
+        </div>
+      </div>
+      <div class="layout-seat-part" data-game-layout-id="seat_right_name">
+        <div class="player-name-stack">
+          <div class="player-name-badge">
+            <span class="player-name"></span>
+            <span class="status-star hidden" aria-hidden="true">★</span>
+          </div>
+          <span class="player-rank-pill hidden"></span>
+        </div>
+      </div>
+
+      <!-- Center table -->
+      <div class="table-center" data-game-layout-id="table_center">
+        <div id="trick-area" class="trick-area"></div>
+      </div>
+      <div id="floor-card" class="floor-card hidden" data-game-layout-id="floor_card"></div>
+
+      <!-- Local player (bottom) -->
+      <div class="layout-seat-part layout-seat-avatar seat-bottom" data-game-layout-id="seat_bottom_avatar">
+        <div class="avatar-wrap">
+          <span class="deck-glow-ring" aria-hidden="true"></span>
+          <div class="timer-ring"></div>
+          <div class="avatar"></div>
+          <span class="dealer-badge hidden">موزع</span>
+          <span class="bid-badge hidden"></span>
+        </div>
+        <div class="chat-bubble hidden"></div>
+      </div>
+      <div class="layout-seat-part" data-game-layout-id="seat_bottom_gifts">
+        <div class="table-gift-slots" aria-hidden="true">
+          <span class="table-gift-slot empty"></span>
+          <span class="table-gift-slot empty"></span>
+          <span class="table-gift-slot empty"></span>
+        </div>
+      </div>
+      <div class="layout-seat-part" data-game-layout-id="seat_bottom_name">
+        <div class="player-name-stack">
+          <div class="player-name-badge">
+            <span class="player-name"></span>
+            <span class="status-star hidden" aria-hidden="true">★</span>
+          </div>
+          <span class="player-rank-pill hidden"></span>
+        </div>
+      </div>
+      <div id="project-bar" class="project-bar hidden" data-game-layout-id="project_bar"></div>
+      <div id="my-hand" class="my-hand" data-game-layout-id="my_hand"></div>
+
+      <div id="trick-collect" class="trick-collect hidden"></div>
+
+      <!-- Action buttons -->
+      <div id="bid-buttons" class="bid-buttons hidden" data-game-layout-id="bid_buttons"></div>
+
+      <button id="btn-sawa" class="btn-sawa hidden" data-game-layout-id="btn_sawa" title="إعلان سوا">سوا</button>
+      <button id="btn-qaid" class="btn-qaid hidden" data-game-layout-id="btn_qaid">قيد</button>
+
+      <div id="quick-chat-overlay" class="quick-chat-overlay hidden" aria-hidden="true">
+        <div class="quick-chat-panel" role="dialog" aria-labelledby="quick-chat-title">
+          <header class="quick-chat-header">
+            <h3 id="quick-chat-title">رسائل سريعة</h3>
+            <button type="button" id="btn-quick-chat-close" class="quick-chat-close" aria-label="إغلاق">✕</button>
+          </header>
+          <div id="quick-chat-grid" class="quick-chat-grid"></div>
+        </div>
+      </div>
+
+      <div id="table-gift-menu-overlay" class="table-gift-overlay hidden" aria-hidden="true">
+        <div class="table-gift-panel" role="dialog" aria-labelledby="table-gift-menu-title">
+          <header class="table-gift-panel-head">
+            <h3 id="table-gift-menu-title">اختر هدية</h3>
+            <button type="button" id="btn-table-gift-close" class="table-gift-close" aria-label="إغلاق">✕</button>
+          </header>
+          <p id="table-gift-balance" class="table-gift-balance">رصيدك: 0 🪙</p>
+          <div id="table-gift-grid" class="table-gift-grid"></div>
+        </div>
+      </div>
+
+      <div id="table-gift-recipient-overlay" class="table-gift-overlay hidden" aria-hidden="true">
+        <div class="table-gift-panel" role="dialog" aria-labelledby="table-gift-recipient-title">
+          <header class="table-gift-panel-head">
+            <h3 id="table-gift-recipient-title">إرسال هدية إلى</h3>
+            <button type="button" id="btn-table-gift-recipient-close" class="table-gift-close" aria-label="إغلاق">✕</button>
+          </header>
+          <p class="table-gift-pick-hint">كل هدية تكلف 5 عملات · الجميع = 5 × عدد اللاعبين الآخرين</p>
+          <div id="table-gift-recipient-list" class="table-gift-recipient-list"></div>
+        </div>
+      </div>
+
+      <div id="table-gift-toast" class="table-gift-toast" aria-live="polite"></div>
+    </div>
+
+    <!-- Hakam Thani Modal -->
+    <div id="modal-hakam" class="modal hidden">
+      <div class="modal-content hakam-modal">
+        <h3>اختر لون الحكم</h3>
+        <p class="modal-sub">يجب أن يكون مختلفاً عن لون الأرض</p>
+        <div class="suit-buttons">
+          <button class="suit-btn" data-suit="HEARTS" style="--suit-color:#e74c3c">
+            <span class="suit-icon">♥</span><span>هاص</span>
+          </button>
+          <button class="suit-btn" data-suit="DIAMONDS" style="--suit-color:#e67e22">
+            <span class="suit-icon">♦</span><span>ديمن</span>
+          </button>
+          <button class="suit-btn" data-suit="CLUBS" style="--suit-color:#2ecc71">
+            <span class="suit-icon">♣</span><span>شيريا</span>
+          </button>
+          <button class="suit-btn" data-suit="SPADES" style="--suit-color:#3498db">
+            <span class="suit-icon">♠</span><span>سبيت</span>
+          </button>
+        </div>
+        <button class="btn-cancel-modal">إلغاء</button>
+      </div>
+    </div>
+
+    <!-- Doubling: مقفل / مفتوح -->
+    <div id="modal-lock" class="modal hidden">
+      <div class="modal-content lock-modal">
+        <h3 id="lock-modal-title">اختر نوع التدبيل</h3>
+        <p class="modal-sub">القهوة دائماً مفتوحة ولا تُسأل</p>
+        <div class="lock-buttons">
+          <button id="btn-lock-open" class="lock-btn open">مفتوح</button>
+          <button id="btn-lock-closed" class="lock-btn closed">مقفل</button>
+        </div>
+        <button class="btn-cancel-lock btn-cancel-modal">إلغاء</button>
+      </div>
+    </div>
+
+    <!-- Qaid Wizard -->
+    <div id="modal-qaid" class="modal hidden">
+      <div class="modal-content qaid-wizard">
+        <div class="qaid-wizard-top">
+          <button type="button" class="btn-close-modal qaid-close" aria-label="إغلاق">✕</button>
+          <span class="qaid-timer">00:59</span>
+        </div>
+        <p id="qaid-spectator-label" class="qaid-spectator-label hidden"></p>
+        <h2 id="qaid-wizard-title" class="qaid-wizard-title">اختر سبب الاعتراض</h2>
+        <p id="qaid-wizard-subtitle" class="qaid-wizard-subtitle">اختر السبب الأقرب لما حدث.</p>
+
+        <section id="qaid-step-1" class="qaid-step-panel" data-step="1">
+          <div class="qaid-step-head">
+            <span class="qaid-step-num active" data-step-dot="1"></span>
+            <div>
+              <h4>1. اختر السبب</h4>
+              <p class="qaid-step-desc">اختر سبب الاعتراض قبل المتابعة.</p>
+            </div>
+          </div>
+          <div id="qaid-reasons" class="qaid-reasons"></div>
+          <button type="button" id="btn-qaid-next-1" class="btn-qaid-continue" disabled>متابعة</button>
+        </section>
+
+        <section id="qaid-step-2" class="qaid-step-panel hidden" data-step="2">
+          <div class="qaid-step-head">
+            <span class="qaid-step-num" data-step-dot="2"></span>
+            <div>
+              <h4>2. إثبات</h4>
+              <p class="qaid-step-desc">راجع الأكلات — من اليمين أول لعب، من اليسار آخر لعب — واختر الكروت المخالفة.</p>
+            </div>
+          </div>
+          <div id="qaid-tricks" class="qaid-tricks-list"></div>
+          <div id="qaid-proof-hands" class="qaid-proof-hands hidden">
+            <p class="qaid-proof-hands-label">أوراق متبقية (لإثبات الكرت القانوني)</p>
+            <div id="qaid-hands" class="qaid-hands-groups"></div>
+          </div>
+          <p id="qaid-proof-counter" class="qaid-proof-counter">0 / 2 كروت</p>
+          <div class="qaid-step-actions">
+            <button type="button" id="btn-qaid-back-2" class="btn-qaid-back">رجوع</button>
+            <button type="button" id="btn-qaid-next-2" class="btn-qaid-continue" disabled>متابعة</button>
+          </div>
+        </section>
+
+        <section id="qaid-step-3" class="qaid-step-panel hidden" data-step="3">
+          <div class="qaid-step-head">
+            <span class="qaid-step-num" data-step-dot="3"></span>
+            <div>
+              <h4>3. إرسال</h4>
+              <p class="qaid-step-desc">اضغط مرة أخرى لتعديل اختياراتك.</p>
+            </div>
+          </div>
+          <div id="qaid-confirm-preview" class="qaid-confirm-preview"></div>
+          <div class="qaid-confirm-summary">
+            <div class="qaid-confirm-row"><span>السبب</span><strong id="qaid-confirm-reason">—</strong></div>
+            <div id="qaid-confirm-cards-row" class="qaid-confirm-row hidden">
+              <span>اللعب المخالف</span>
+              <div id="qaid-confirm-cards" class="qaid-confirm-cards"></div>
+            </div>
+          </div>
+          <div class="qaid-step-actions">
+            <button type="button" id="btn-qaid-back-3" class="btn-qaid-back">تعديل</button>
+            <button type="button" id="btn-submit-qaid" class="btn-qaid-send">إرسال</button>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Score Summary (النشرة) -->
+    <div id="modal-summary" class="modal modal-center hidden">
+      <div id="summary-card" class="modal-content summary-modal">
+        <h3>النشرة</h3>
+        <p id="summary-bid-info" class="summary-bid-info"></p>
+        <p id="summary-buyer" class="summary-buyer"></p>
+        <div id="summary-table-wrap" class="summary-table-wrap">
+          <table id="summary-table" class="summary-table" aria-label="تفاصيل النشرة"></table>
+        </div>
+        <p id="summary-scores" class="summary-scores"></p>
+        <p id="summary-note" class="summary-note hidden"></p>
+        <p id="summary-totals" class="summary-totals"></p>
+        <p id="summary-result" class="summary-result"></p>
+      </div>
+    </div>
+
+    <!-- Match End -->
+    <div id="modal-match-end" class="modal modal-match-end hidden">
+      <div id="match-end-card" class="match-end-card">
+        <div id="match-end-banner" class="match-end-banner">
+          <h2 id="match-end-title">مبروك</h2>
+          <p class="match-end-sub">النتيجة</p>
+          <div class="match-end-scores-big">
+            <div class="match-score us">
+              <span class="match-score-label">لنا</span>
+              <strong id="match-end-us">0</strong>
+            </div>
+            <div class="match-score them">
+              <span class="match-score-label">لهم</span>
+              <strong id="match-end-them">0</strong>
+            </div>
+          </div>
+        </div>
+        <div class="match-end-body">
+          <div class="match-end-player">
+            <div id="match-end-avatar" class="match-end-avatar"></div>
+            <strong id="match-end-name" class="match-end-name">لاعب</strong>
+            <span id="match-end-rank" class="match-end-rank">مبتدئ ♣️</span>
+          </div>
+          <div class="match-end-progress-block">
+            <div class="match-end-progress-track">
+              <div id="match-end-progress-fill" class="match-end-progress-fill"></div>
+            </div>
+            <p id="match-end-progress-text" class="match-end-progress-text">0 / 100</p>
+            <p id="match-end-points-delta" class="match-end-points-delta">+0 نقطة</p>
+          </div>
+        </div>
+        <div class="match-end-actions">
+          <button type="button" id="btn-match-leave" class="btn-match-action btn-match-leave">مغادرة</button>
+          <button type="button" id="btn-match-again" class="btn-match-action btn-match-play">قهوة جديدة</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dealing overlay -->
+    <div id="dealing-overlay" class="dealing-overlay hidden"></div>
+  </div>
+
+  <!-- Bottom navigation -->
+  <nav id="bottom-nav" aria-label="التنقل الرئيسي">
+    <div class="bottom-nav-inner">
+      <button type="button" id="nav-home" class="bottom-nav-item" data-screen="home">
+        <span class="nav-icon">🏠</span>
+        <span>الرئيسية</span>
+      </button>
+      <button type="button" id="nav-store" class="bottom-nav-item" data-screen="store">
+        <span class="nav-icon">🛒</span>
+        <span>المتجر</span>
+      </button>
+      <button type="button" id="nav-friends" class="bottom-nav-item" data-screen="friends">
+        <span class="nav-icon">👥</span>
+        <span>الأصدقاء</span>
+      </button>
+      <button type="button" id="nav-bag" class="bottom-nav-item" data-screen="bag">
+        <span class="nav-icon">🎒</span>
+        <span>الحقيبة</span>
+      </button>
+      <button type="button" id="nav-chat" class="bottom-nav-item" data-screen="chat">
+        <span class="nav-icon">💬</span>
+        <span>الشات</span>
+      </button>
+    </div>
+  </nav>
+
+  <script src="/js/loading.js"></script>
+  <script src="/js/dom.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/ranks.js"></script>
+  <script src="/js/radar.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/settings.js"></script>
+  <script src="/js/ranked.js"></script>
+  <script src="/js/sessions.js"></script>
+  <script src="/js/statusBadge.js"></script>
+  <script src="/js/tournaments.js"></script>
+  <script src="/js/leaderboards.js"></script>
+  <script src="/js/store.js"></script>
+  <script src="/js/bag.js"></script>
+  <script src="/js/chat.js"></script>
+  <script src="/js/gifts.js"></script>
+  <script src="/js/friends.js"></script>
+  <script src="/js/cards.js"></script>
+  <script src="/js/quickChat.js"></script>
+  <script src="/js/tableGifts.js"></script>
+  <script src="/js/qaid_ui.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/nav-bar.js"></script>
+  <script src="/js/home-layout-editor.js"></script>
+  <script src="/js/game-layout-editor.js"></script>
+  <script src="/js/home.js"></script>
+</body>
+</html>

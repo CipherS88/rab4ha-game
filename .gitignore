@@ -1,0 +1,15 @@
+node_modules/
+data/
+backup/
+.env
+.env.*
+*.log
+.DS_Store
+Thumbs.db
+.cursor/
+
+rab4ha_flutter/.dart_tool/
+rab4ha_flutter/build/
+rab4ha_flutter/.flutter-plugins-dependencies
+rab4ha_flutter/.packages
+rab4ha_flutter/.idea/

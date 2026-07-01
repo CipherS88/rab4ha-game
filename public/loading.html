@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ربعها - جاري التحميل</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        body {
+            background-color: #08080c;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* حاوية شاشة التحميل الرئيسية */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #151d2a 0%, #070a0f 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.8s ease-out, visibility 0.8s;
+        }
+
+        /* تأثير اختفاء شاشة التحميل بعد انتهاء التحميل */
+        .loading-screen.fade-out {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        /* جزيئات الإضاءة الخلفية */
+        .bg-glow {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, transparent 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            filter: blur(30px);
+            animation: pulseGlow 4s infinite ease-in-out;
+            pointer-events: none;
+        }
+
+        /* شعار اللعبة الفخم */
+        .game-title {
+            font-size: 3.5rem;
+            font-weight: 900;
+            margin-bottom: 50px;
+            letter-spacing: 2px;
+            /* تأثير النص الذهبي المعدني */
+            background: linear-gradient(45deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0px 4px 15px rgba(187, 145, 47, 0.3));
+            animation: titleFloat 3s infinite ease-in-out;
+        }
+
+        /* حاوية حركة الكروت ثلاثية الأبعاد */
+        .cards-container {
+            position: relative;
+            width: 200px;
+            height: 150px;
+            perspective: 1000px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        /* التصميم الموحد للكارت */
+        .card {
+            position: absolute;
+            width: 75px;
+            height: 115px;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border: 2px solid #c5a059;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.2rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(197, 160, 89, 0.2);
+            transform-style: preserve-3d;
+            transform-origin: bottom center;
+            animation: cardOrbit 6s infinite cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        /* تخصيص الكروت الأربعة وتوقيت حركتها والنقوش */
+        .card.spade   { color: #ffffff; animation-delay: 0s; text-shadow: 0 0 10px rgba(255,255,255,0.3); }
+        .card.diamond { color: #ef4444; animation-delay: 1.5s; border-color: #ef4444; box-shadow: 0 10px 25px rgba(239, 68, 68, 0.2); }
+        .card.club    { color: #c5a059; animation-delay: 3s; }
+        .card.heart   { color: #ef4444; animation-delay: 4.5s; border-color: #ef4444; box-shadow: 0 10px 25px rgba(239, 68, 68, 0.2); }
+
+        /* منطقة تفاصيل التحميل السفلى */
+        .loading-status {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 250px;
+        }
+
+        .loading-text {
+            color: #94a3b8;
+            font-size: 0.95rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            animation: pulseText 1.5s infinite ease-in-out;
+        }
+
+        /* بار التحميل النحيف والأنيق */
+        .progress-bar-container {
+            width: 100%;
+            height: 4px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%; /* يتم التحكم به عبر الجافاسكريبت أو أنيميشن وهمي */
+            background: linear-gradient(90deg, #aa771c, #fcf6ba, #bf953f);
+            box-shadow: 0 0 10px #fcf6ba;
+            border-radius: 10px;
+            animation: simulateLoading 4s forwards cubic-bezier(0.1, 0.8, 0.2, 1);
+        }
+
+        /* ================= الانميشن والحركات CSS ================= */
+
+        /* حركة دوران وتداخل الكروت الفخمة */
+        @keyframes cardOrbit {
+            0% {
+                transform: rotate(0deg) translateY(0) scale(1) rotateY(0deg);
+                z-index: 1;
+            }
+            25% {
+                transform: rotate(15deg) translateY(-25px) scale(1.1) rotateY(180deg);
+                z-index: 4;
+            }
+            50% {
+                transform: rotate(0deg) translateY(0) scale(1) rotateY(360deg);
+                z-index: 2;
+            }
+            75% {
+                transform: rotate(-15deg) translateY(15px) scale(0.9) rotateY(180deg);
+                z-index: 1;
+            }
+            100% {
+                transform: rotate(0deg) translateY(0) scale(1) rotateY(0deg);
+                z-index: 1;
+            }
+        }
+
+        /* حركة عوم الشعار */
+        @keyframes titleFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); filter: drop-shadow(0px 8px 25px rgba(187, 145, 47, 0.5)); }
+        }
+
+        /* نبض الإضاءة الخلفية */
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+        }
+
+        /* نبض نص جاري التحميل */
+        @keyframes pulseText {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; color: #e2e8f0; }
+        }
+
+        /* أنيميشن وهمي لبار التحميل ليعطي انطباع بالحركة السريعة ثم الثبات قبل الفتح */
+        @keyframes simulateLoading {
+            0% { width: 0%; }
+            20% { width: 35%; }
+            45% { width: 55%; }
+            70% { width: 85%; }
+            100% { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="loading-screen" id="loadingScreen">
+        <div class="bg-glow"></div>
+        
+        <h1 class="game-title">رِبْعِهَا</h1>
+
+        <div class="cards-container">
+            <div class="card spade">♠</div>
+            <div class="card diamond">♦</div>
+            <div class="card club">♣</div>
+            <div class="card heart">♥</div>
+        </div>
+
+        <div class="loading-status">
+            <span class="loading-text">جاري تحميل مجلس البلوت...</span>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <div style="color: white; text-align: center; font-size: 2rem; font-weight: bold;">
+        أهلاً بك في لعبة ربعها! 🃏✨
+    </div>
+
+    <script>
+        // كود ذكي: بمجرد أن ينتهي المتصفح من تحميل كافة ملفات الصور والمحرك والصوت للعبة بالكامل، تختفي الشاشة بسلاسة.
+        window.addEventListener('load', function () {
+            const loader = document.getElementById('loadingScreen');
+            
+            // تأخير بسيط لمدة نصف ثانية بعد اكتمال التحميل لضمان سلاسة حركة بار التحميل
+            setTimeout(() => {
+                loader.classList.add('fade-out');
+            }, 500); 
+        });
+    </script>
+</body>
+</html>

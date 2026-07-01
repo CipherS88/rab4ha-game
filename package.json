@@ -1,0 +1,27 @@
+{
+  "name": "baloot-web",
+  "version": "1.0.0",
+  "description": "Web-based Baloot card game",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "stop": "node scripts/stop.js",
+    "restart": "node scripts/stop.js && node server/index.js",
+    "dev": "node server/index.js",
+    "admin:promote": "node scripts/promote-admin.js",
+    "flutter:build": "cd rab4ha_flutter && flutter build web --dart-define=FLAVOR=dev --base-href=/app/ --no-tree-shake-icons --no-wasm-dry-run",
+    "layout:bake": "node scripts/bake-game-layout-defaults.js",
+    "flutter:run": "cd rab4ha_flutter && flutter run --dart-define=FLAVOR=dev --dart-define=API_BASE_URL=http://localhost:3000 -d chrome",
+    "start:full": "npm run flutter:build && npm start",
+    "test:qaid": "node test/qaid_ui_test.js && node test/qaid_logic_test.js && node test/qaid_hakam_test.js",
+    "test:scoring": "node test/ground_scoring_test.js && node test/scoring_engine_test.js",
+    "test:bot": "node test/bot_brain_test.js",
+    "test:trick": "node test/trick_evaluation_test.js",
+    "test:game": "node test/qaid_ui_test.js && node test/ground_scoring_test.js && node test/scoring_engine_test.js && cd rab4ha_flutter && flutter test test/core_logic_test.dart"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}
