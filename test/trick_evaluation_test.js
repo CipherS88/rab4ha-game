@@ -73,7 +73,7 @@ function trickEngine(opts) {
   assert.strictEqual(e.evaluate_trick()[0], 0);
 }
 
-// ── حكم مفتوح: صن على لون البداية ──
+// ── حكم مفتوح: الفائز يُحدَّد كـ 1.py (الحكم يأكل غير الحكم) ──
 {
   const e = trickEngine({
     bidType: 'HAKAM',
@@ -85,6 +85,21 @@ function trickEngine(opts) {
       { player: 1, card: { suit: 'CLUBS', rank: 'J' } },
       { player: 2, card: { suit: 'HEARTS', rank: '10' } },
       { player: 3, card: { suit: 'HEARTS', rank: 'K' } },
+    ],
+  });
+  assert.strictEqual(e.evaluate_trick()[0], 1);
+}
+
+// ── حكم سبيت: شيرية لا تأكل سبيت الحكم ──
+{
+  const e = trickEngine({
+    bidType: 'HAKAM',
+    bidSuit: 'SPADES',
+    trick: [
+      { player: 0, card: { suit: 'SPADES', rank: 'A' } },
+      { player: 1, card: { suit: 'CLUBS', rank: 'J' } },
+      { player: 2, card: { suit: 'SPADES', rank: '10' } },
+      { player: 3, card: { suit: 'SPADES', rank: 'K' } },
     ],
   });
   assert.strictEqual(e.evaluate_trick()[0], 0);

@@ -3,7 +3,6 @@ const { getSeatMeta } = require('./playerMeta');
 const { getEquippedSessionBg, getDefaultSessionBgUrl } = require('./bag');
 const { startMatch, logRound, endMatch } = require('./matchLog');
 const { RadarMatchTracker, applyRadarMatchResults } = require('./playRadar');
-const { chooseEmergencyCard } = require('./emergencyBot');
 const { chooseBotProjects, botHasSawa } = require('./botBrain');
 const {
   TABLE_GIFT_COST,
@@ -793,10 +792,7 @@ class GameRoom {
       my_seat: seatIdx,
       my_hand: hand.map((c) => ({ ...c })),
       my_hand_count: hand.length,
-      legal_cards: e.phase === GamePhase.PLAYING && e.turn === seatIdx
-        && !e.sawa_declaration && !this.qaidSession
-        ? e.get_legal_cards(seatIdx)
-        : [],
+      legal_cards: [],
       available_bids: e.get_available_bids(seatIdx),
       project_details: e._getProjectDetails(seatIdx),
       can_ashkal: e.can_ashkal(seatIdx),
@@ -928,11 +924,8 @@ class GameRoom {
       if (e.trick_count === 1 && !e.played_in_trick1[seatIdx]) {
         e.apply_project_declarations(seatIdx, {});
       }
-      const legal = e.get_legal_cards(seatIdx);
-      if (legal.length) {
-        let move = chooseEmergencyCard(e, seatIdx);
-        if (!legal.includes(move)) move = legal[0];
-        e.play_card(seatIdx, move);
+      if (e.hands[seatIdx]?.length) {
+        e.play_card(seatIdx, 0);
       }
       this.addPlayChatBubbles(seatIdx, e);
       this.broadcast('card_thrown', { player: seatIdx });
@@ -990,11 +983,12 @@ class GameRoom {
         const { valid } = e.apply_project_declarations(seatIdx, counts);
         if (valid.length) projBubble = valid.join(' · ');
       }
-      const legal = e.get_legal_cards(seatIdx);
-      if (legal.length) {
-        let move = e.get_bot_best_move(seatIdx);
-        if (!legal.includes(move)) move = legal[0];
-        e.play_card(seatIdx, move);
+      const handLen = e.hands[seatIdx]?.length ?? 0;
+      if (handLen) {
+        const move = e.get_bot_best_move(seatIdx);
+        if (move >= 0 && move < handLen) {
+          e.play_card(seatIdx, move);
+        }
       }
       if (projBubble) this.addChat(seatIdx, projBubble);
       this.addPlayChatBubbles(seatIdx, e);

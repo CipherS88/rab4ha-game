@@ -17,7 +17,8 @@
     "test:scoring": "node test/ground_scoring_test.js && node test/scoring_engine_test.js",
     "test:bot": "node test/bot_brain_test.js",
     "test:trick": "node test/trick_evaluation_test.js",
-    "test:game": "node test/qaid_ui_test.js && node test/ground_scoring_test.js && node test/scoring_engine_test.js && cd rab4ha_flutter && flutter test test/core_logic_test.dart"
+    "test:game": "node test/qaid_ui_test.js && node test/ground_scoring_test.js && node test/scoring_engine_test.js && cd rab4ha_flutter && flutter test test/core_logic_test.dart",
+    "test": "npm run test:trick && npm run test:scoring && npm run test:qaid && npm run test:bot"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",

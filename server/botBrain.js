@@ -215,7 +215,7 @@ function opponentMayBeat(engine, memory, card) {
     }
     return false;
   }
-  if (!engine.is_hakam_open_play?.() && !isCardSeen(memory, trump, 'J')) return true;
+  if (!isCardSeen(memory, trump, 'J')) return true;
   if (!isCardSeen(memory, card.suit, 'A')) return true;
   return false;
 }
@@ -371,11 +371,19 @@ function chooseFollow(engine, playerIdx, legalMoves, hand, partnerIdx, memory, s
 }
 
 function chooseBotCard(engine, playerIdx) {
+  const hand = engine.hands[playerIdx];
   const legalMoves = engine.get_legal_cards(playerIdx);
+
+  if (Math.random() < 0.03 && hand.length > 1) {
+    const allMoves = hand.map((_, i) => i);
+    const illegalMoves = allMoves.filter((m) => !legalMoves.includes(m));
+    if (illegalMoves.length) {
+      return illegalMoves[Math.floor(Math.random() * illegalMoves.length)];
+    }
+  }
+
   if (!legalMoves.length) return 0;
   if (legalMoves.length === 1) return legalMoves[0];
-
-  const hand = engine.hands[playerIdx];
   const partnerIdx = (playerIdx + 2) % 4;
   const memory = buildMemory(engine);
   const signals = analyzePartnerSignals(engine, playerIdx);

@@ -538,39 +538,6 @@ class BalootEngine {
     return this.bid.type === 'HAKAM' && this.double_level > 1 && this.hakam_locked;
   }
 
-  /** حكم مفتوح (دبل/ثري/فور مفتوح): يُناقَش لاحقاً — حالياً فقط عند التدبيل غير المقفل */
-  is_hakam_open_play() {
-    return this.bid.type === 'HAKAM' && this.double_level > 1 && !this.hakam_locked;
-  }
-
-  _winnerAmongLeadSuit(trick, lead_suit) {
-    const leadCards = trick.filter((t) => t.card.suit === lead_suit);
-    if (!leadCards.length) return [trick[0].player, trick[0].card];
-    let winner_idx = leadCards[0].player;
-    let winning_card = leadCards[0].card;
-    for (const { player, card } of leadCards.slice(1)) {
-      if (SUN_RANKING.indexOf(card.rank) < SUN_RANKING.indexOf(winning_card.rank)) {
-        winning_card = card;
-        winner_idx = player;
-      }
-    }
-    return [winner_idx, winning_card];
-  }
-
-  _winnerAmongTrump(trick, hakam_suit) {
-    const trumpCards = trick.filter((t) => t.card.suit === hakam_suit);
-    if (!trumpCards.length) return this._winnerAmongLeadSuit(trick, trick[0].card.suit);
-    let winner_idx = trumpCards[0].player;
-    let winning_card = trumpCards[0].card;
-    for (const { player, card } of trumpCards.slice(1)) {
-      if (HAKAM_RANKING.indexOf(card.rank) < HAKAM_RANKING.indexOf(winning_card.rank)) {
-        winning_card = card;
-        winner_idx = player;
-      }
-    }
-    return [winner_idx, winning_card];
-  }
-
   get_qaid_reasons() {
     const reasons = [...QAID_REASONS[isSunBid(this.bid) ? 'SUN' : 'HAKAM']];
     if (!this.is_muqfal_lead_restricted()) {
@@ -1024,14 +991,18 @@ class BalootEngine {
   _classifyMistake(player_idx, card_index) {
     const hand = this.hands[player_idx];
     const card = hand[card_index];
-    const legal_moves = this.get_legal_cards(player_idx);
-    if (legal_moves.includes(card_index)) return null;
 
     if (!this.current_trick.length) {
       if (this.is_muqfal_lead_restricted() && card.suit === this.bid.suit) {
         const hasNonTrump = hand.some((c) => c.suit !== this.bid.suit);
         if (hasNonTrump) return 'ربع في المقفل';
       }
+    }
+
+    const legal_moves = this.get_legal_cards(player_idx);
+    if (legal_moves.includes(card_index)) return null;
+
+    if (!this.current_trick.length) {
       return 'قاطع';
     }
 
@@ -1073,11 +1044,6 @@ class BalootEngine {
   get_legal_cards(player_idx) {
     const hand = this.hands[player_idx];
     if (!this.current_trick.length) {
-      if (this.is_muqfal_lead_restricted() && this.bid.suit) {
-        const hakam_suit = this.bid.suit;
-        const non_trump = hand.map((c, i) => (c.suit !== hakam_suit ? i : -1)).filter((i) => i >= 0);
-        if (non_trump.length) return non_trump;
-      }
       return hand.map((_, i) => i);
     }
 
@@ -1142,10 +1108,6 @@ class BalootEngine {
       const { player: player_idx, card } = item;
       trick_points += is_sun ? SUN_VALUES[card.rank] : card.suit === hakam_suit ? HAKAM_VALUES[card.rank] : SUN_VALUES[card.rank];
 
-      if (!is_sun && this.is_hakam_open_play()) {
-        continue;
-      }
-
       if (is_sun) {
         if (
           card.suit === lead_suit
@@ -1171,22 +1133,6 @@ class BalootEngine {
       }
     }
 
-    if (!is_sun && this.is_hakam_open_play()) {
-      const buyerSeat = this.buyer_seat ?? this.bid.bidder;
-      const trumpPlays = this.current_trick.filter((t) => t.card.suit === hakam_suit);
-      const onlyBuyerTrump = trumpPlays.length === 1
-        && trumpPlays[0].player === buyerSeat
-        && this.current_trick.filter((t) => t.card.suit !== hakam_suit).length === 3;
-
-      if (onlyBuyerTrump) {
-        winner_idx = trumpPlays[0].player;
-      } else if (lead_suit === hakam_suit) {
-        [winner_idx] = this._winnerAmongTrump(this.current_trick, hakam_suit);
-      } else {
-        [winner_idx] = this._winnerAmongLeadSuit(this.current_trick, lead_suit);
-      }
-    }
-
     return [winner_idx, trick_points];
   }
 
@@ -1197,17 +1143,17 @@ class BalootEngine {
     if (this.current_trick.length >= 4) return false;
 
     const legal_moves = this.get_legal_cards(player_idx);
-    const is_mistake = !legal_moves.includes(card_index);
+    const mistakeType = this._classifyMistake(player_idx, card_index);
+    const is_mistake = !legal_moves.includes(card_index) || mistakeType !== null;
     const card = this.hands[player_idx][card_index];
 
     if (is_mistake) {
       const legal_cards = legal_moves.map((i) => this.hands[player_idx][i]);
-      const mistakeType = this._classifyMistake(player_idx, card_index) || 'قاطع';
       this.mistakes.push({
         player: player_idx,
         played_card: { ...card },
         legal_cards_held: legal_cards,
-        type: mistakeType,
+        type: mistakeType || 'قاطع',
       });
     }
 

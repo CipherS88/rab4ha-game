@@ -181,7 +181,7 @@ for (const level of [2, 3, 4]) {
   assert.strictEqual(winner, 0, 'آس الهاص يأخذ الأكلة على ولد الهاص في الحكم المفتوح');
 }
 
-// ── حكم مفتوح: الحكم لا يأكل إلا إذا المشتري وحده دقّ ──
+// ── حكم مفتوح: الفائز مطابق 1.py (الحكم يأكل) ──
 {
   const e = playingEngine({ bidType: 'HAKAM', bidSuit: 'CLUBS' });
   e.double_level = 2;
@@ -194,7 +194,7 @@ for (const level of [2, 3, 4]) {
     { player: 3, card: { suit: 'HEARTS', rank: 'K' } },
   ];
   const [winner] = e.evaluate_trick();
-  assert.strictEqual(winner, 0, 'الحكم لا يأكل تلقائياً في المفتوح');
+  assert.strictEqual(winner, 1, 'ولد الحكم يأخذ الأكلة على آس الهاص (مطابق 1.py)');
 }
 
 // ── حكم مفتوح: المشتري وحده دقّ بالحكم ──
