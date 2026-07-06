@@ -164,7 +164,7 @@ class SandboxSeatAvatar extends StatelessWidget {
         TurnTimerRing(active: isTurn, startedAtMs: turnStartedAtMs, size: 56),
         PlayerAvatar(data: player, size: 48, vipFrame: true),
         if (isDealer)
-          const Positioned(top: -4, right: -4, child: Text('🎯', style: TextStyle(fontSize: 12))),
+          const Positioned(bottom: -6, right: -6, child: DealerBadge()),
       ],
     );
   }

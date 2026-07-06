@@ -27,7 +27,31 @@ function resolveGameMode(roomId) {
   if (roomId === 'match52') return 'match52';
   if (roomId === 'ranked') return 'ranked';
   if (roomId.startsWith('session_')) return 'session';
+  if (roomId.startsWith('tourney_')) return 'tournament';
   return 'friendly';
+}
+
+function isTournamentRoomId(roomId) {
+  return typeof roomId === 'string' && roomId.startsWith('tourney_');
+}
+
+function tournamentSeatName(userId) {
+  try {
+    const { db } = require('./db');
+    const row = db.prepare('SELECT display_name FROM users WHERE id = ?').get(userId);
+    return (row?.display_name || 'لاعب').slice(0, 20);
+  } catch (_) {
+    return 'لاعب';
+  }
+}
+
+function isTournamentBotUser(userId) {
+  try {
+    const { isBotUser } = require('./auth');
+    return isBotUser(userId);
+  } catch (_) {
+    return false;
+  }
 }
 
 function normalizeRoomId(roomId) {
@@ -69,6 +93,7 @@ class GameRoom {
     this.sawaObjectionRemainingMs = null;
     this.chatBubbles = {};
     this.tableGiftSlots = [[], [], [], []];
+    this.spectators = new Map(); // socketId -> { name, userId }
     this.onBroadcast = null;
     this.onAbandoned = null;
     this.idleCleanupTimer = null;
@@ -81,6 +106,53 @@ class GameRoom {
     this.sessionId = roomId.startsWith('session_') ? parseInt(roomId.slice(8), 10) : null;
     this.matchLogId = null;
     this.summaryLoggedForRound = false;
+    this.tournamentMatch = null; // { tournamentId, matchId } لغرف مباريات البطولة
+    this.tournamentInitialScores = null;
+  }
+
+  /** تجهيز مقاعد مباراة بطولة: الفريق 1 (مقاعد 0,2) والفريق 2 (مقاعد 1,3)، وملء الشواغر ببوتات. */
+  setupTournamentSeats(team1 = [], team2 = []) {
+    this.clearTimers();
+    this.status = 'lobby';
+    this.engine = null;
+    // ترتيب المقاعد: شريكان متقابلان (0,2) ضد (1,3).
+    const layout = [team1[0] ?? null, team2[0] ?? null, team1[1] ?? null, team2[1] ?? null];
+    for (let i = 0; i < 4; i++) {
+      const uid = layout[i];
+      if (uid != null && isTournamentBotUser(uid)) {
+        // حساب بوت (اختبار الأدمن) → يُلعب بالذكاء الاصطناعي الحقيقي مباشرة.
+        this.seats[i] = {
+          id: `tbot_${uid}`,
+          name: tournamentSeatName(uid),
+          isBot: true,
+          socketId: null,
+        };
+      } else if (uid != null) {
+        this.seats[i] = {
+          id: `t_${uid}`,
+          name: tournamentSeatName(uid),
+          isBot: false,
+          socketId: null,
+          userId: uid,
+          disconnected: true, // بانتظار اتصال اللاعب — البوت يلعب مؤقتاً إن تأخّر
+          meta: getSeatMeta(uid),
+        };
+      } else {
+        this.seats[i] = {
+          id: `bot_${i}`,
+          name: BOT_NAMES[i % BOT_NAMES.length],
+          isBot: true,
+          socketId: null,
+        };
+      }
+    }
+    this.broadcast('room_update', this.getRoomState());
+    // امنح مهلة قصيرة لدخول اللاعبين ثم ابدأ (البوتات/اللعب الاضطراري يغطّي المتأخرين).
+    setTimeout(() => {
+      if (this.status === 'lobby' && this.seats.filter(Boolean).length >= 4) {
+        this.startGame();
+      }
+    }, 2500);
   }
 
   enrichSummaryData(summary) {
@@ -327,6 +399,27 @@ class GameRoom {
     return { seat, player };
   }
 
+  /** إضافة مشاهد (Spectator) — لا يشغل مقعداً ويستقبل بث اللعبة العام فقط */
+  addSpectator(socketId, name, userId = null) {
+    if (this.soloMode) return { error: 'لا يمكن مشاهدة وضع التجربة الفردية' };
+    if (this.findSeatBySocket(socketId) >= 0) {
+      return { error: 'أنت لاعب في هذه الجلسة' };
+    }
+    this.spectators.set(socketId, {
+      name: name ? String(name).slice(0, 20) : 'مشاهد',
+      userId: userId || null,
+    });
+    return { spectator: true };
+  }
+
+  removeSpectator(socketId) {
+    return this.spectators.delete(socketId);
+  }
+
+  isSpectator(socketId) {
+    return this.spectators.has(socketId);
+  }
+
   removePlayer(socketId, options = {}) {
     const intentional = !!options.intentional;
     if (this.soloMode && this.seats.some((s) => s && s.socketId === socketId)) {
@@ -372,7 +465,8 @@ class GameRoom {
     if (wasPlaying && !intentional && player && !player.isBot) {
       this.seats[idx] = { ...player, socketId: null, disconnected: true };
       this.broadcast('room_update', this.getRoomState());
-      if (this.countConnectedHumans() === 0) {
+      // في البطولة نترك البوتات تكمل المباراة لتُسجَّل النتيجة وتتقدّم الشجرة.
+      if (this.countConnectedHumans() === 0 && this.gameMode !== 'tournament') {
         this.scheduleIdleCleanup();
       }
       return { type: 'disconnected', seat: idx };
@@ -410,6 +504,9 @@ class GameRoom {
   }
 
   fillBots() {
+    if (this.gameMode === 'ranked') {
+      return { error: 'المباريات المصنّفة للاعبين الحقيقيين فقط — لا بوتات' };
+    }
     if (this.countConnectedHumans() !== 1) {
       return { error: 'يجب أن تكون وحدك في الغرفة لملء البوتات' };
     }
@@ -455,9 +552,13 @@ class GameRoom {
     const mySeatDeck = this.seats.find((s) => s?.meta?.deck_back_url)?.meta?.deck_back_url;
     if (mySeatDeck) this.cardBackUrl = mySeatDeck;
     this.status = 'playing';
-    const engineOpts = this.gameMode === 'match52'
-      ? { initialScores: { 1: 52, 2: 52 }, matchMode: 'match52' }
-      : {};
+    const engineOpts = {};
+    if (this.gameMode === 'match52') {
+      engineOpts.initialScores = { 1: 52, 2: 52 };
+      engineOpts.matchMode = 'match52';
+    } else if (this.tournamentInitialScores) {
+      engineOpts.initialScores = this.tournamentInitialScores;
+    }
     this.engine = new BalootEngine(engineOpts);
     if (this.sandboxMode) {
       this.matchLogId = null;
@@ -745,14 +846,15 @@ class GameRoom {
       sawa_reveal_ms: e.sawa_declaration ? SAWA_REVEAL_MS : null,
       sawa_objection_ms: e.sawa_declaration?.phase === 'objection' ? SAWA_OBJECTION_MS : null,
       sawa_objection_paused: !!(this.qaidSession && e.sawa_declaration),
-      qaid_session: this.qaidSession
-        ? {
-          seat: this.qaidSession.seat,
-          reason: this.qaidSession.reason,
-          cards: (this.qaidSession.cards || []).map((c) => ({ ...c })),
-          started_at: this.qaidSession.started_at,
-        }
-        : null,
+      qaid_session:
+        e.phase === GamePhase.SCORE_SUMMARY || !this.qaidSession
+          ? null
+          : {
+              seat: this.qaidSession.seat,
+              reason: this.qaidSession.reason,
+              cards: (this.qaidSession.cards || []).map((c) => ({ ...c })),
+              started_at: this.qaidSession.started_at,
+            },
       sawa_hands: e.sawa_declaration
         ? e.hands.map((hand, i) => ({
           seat: i,
@@ -870,6 +972,18 @@ class GameRoom {
               matchLogId: this.matchLogId,
               seats: this.seats.map((s, i) => this.seatToPublic(s, i)),
             });
+            // بطولة: بلّغ محرك البطولة بالنتيجة ثم أغلق الغرفة بعد فترة قصيرة.
+            if (this.gameMode === 'tournament' && this.tournamentMatch) {
+              const tm = this.tournamentMatch;
+              try {
+                const te = require('./tournamentEngine');
+                te.onTournamentMatchOver(tm.tournamentId, tm.matchId, winner, { ...e.total_scores });
+              } catch (_) {}
+              this.tournamentMatch = null;
+              setTimeout(() => {
+                try { this.abandonInactiveRoom({ reason: 'tournament_match_done' }); } catch (_) {}
+              }, 10000);
+            }
             return;
           }
           this.summaryLoggedForRound = false;
@@ -970,10 +1084,7 @@ class GameRoom {
     const e = this.engine;
     if (e.phase === GamePhase.PLAYING) {
       if (e.can_declare_sawa(seatIdx) && botHasSawa(e, seatIdx) && e.validate_sawa_correctness(seatIdx)) {
-        e.try_declare_sawa(seatIdx);
-        this.addChat(seatIdx, 'سوا');
-        this.broadcastState();
-        this.scheduleBotTurn();
+        this.handleSawa(seatIdx);
         return;
       }
 
@@ -1102,6 +1213,55 @@ class GameRoom {
     return { ok: true, ...payload };
   }
 
+  /** هدايا من مشاهد (لا يملك مقعداً) إلى اللاعبين الجالسين */
+  handleSpectatorGift(socketId, { giftId, target } = {}) {
+    const spec = this.spectators.get(socketId);
+    if (!spec || !spec.userId) return { error: 'لا يمكن إرسال هدايا من هذا الحساب' };
+    if (!isValidTableGiftId(giftId)) return { error: 'هدية غير صالحة' };
+
+    const emoji = getTableGiftEmoji(giftId);
+    let recipientSeats = [];
+    if (target === 'all') {
+      recipientSeats = [0, 1, 2, 3].filter((i) => this.seats[i]);
+    } else {
+      const toSeat = parseInt(target, 10);
+      if (!Number.isFinite(toSeat) || toSeat < 0 || toSeat > 3) {
+        return { error: 'مستلم غير صالح' };
+      }
+      if (!this.seats[toSeat]) return { error: 'المقعد فارغ' };
+      recipientSeats = [toSeat];
+    }
+    if (!recipientSeats.length) return { error: 'لا يوجد مستلمون' };
+
+    const totalCost = recipientSeats.length * TABLE_GIFT_COST;
+    const paid = deductTableGiftCoins(spec.userId, totalCost);
+    if (paid.error) return paid;
+
+    if (!this.tableGiftSlots) this.tableGiftSlots = [[], [], [], []];
+    const deliveries = recipientSeats.map((toSeat) => {
+      this.tableGiftSlots[toSeat] = pushTableGiftSlot(
+        this.tableGiftSlots[toSeat],
+        giftId,
+        emoji,
+        -1,
+      );
+      return { toSeat, slots: this.tableGiftSlots[toSeat].map((s) => ({ ...s })) };
+    });
+
+    const payload = {
+      fromSeat: -1,
+      fromSpectator: true,
+      senderName: spec.name,
+      giftId,
+      emoji,
+      deliveries,
+      senderCoins: paid.coins,
+      table_gift_slots: this.tableGiftSlots.map((row) => row.map((s) => ({ ...s }))),
+    };
+    this.broadcast('table_gift', payload);
+    return { ok: true, ...payload };
+  }
+
   getTableGiftSlotsPublic() {
     return (this.tableGiftSlots || [[], [], [], []]).map((row) => row.map((s) => ({ ...s })));
   }
@@ -1140,7 +1300,7 @@ class GameRoom {
     return { ok: true };
   }
 
-  handlePlayCard(seatIdx, cardIndex, projectCounts = null, playMs = null) {
+  handlePlayCard(seatIdx, cardIndex, projectCounts = null, playMs = null, isEkkahDeclared = false) {
     if (this.sandboxMode) return { error: 'وضع تعديل الواجهة — اللعب متوقف' };
     const e = this.engine;
     if (!e || e.phase !== GamePhase.PLAYING) return { error: 'ليست مرحلة اللعب' };
@@ -1153,7 +1313,7 @@ class GameRoom {
       if (valid.length) this.addChat(seatIdx, valid.join(' · '));
     }
 
-    const ok = e.play_card(seatIdx, cardIndex);
+    const ok = e.play_card(seatIdx, cardIndex, { is_ekkah_declared: isEkkahDeclared === true });
     if (!ok) return { error: 'حركة غير صالحة' };
 
     if (this.radarTracker) {
@@ -1167,6 +1327,13 @@ class GameRoom {
     if (rev?.names?.length) this.addChat(seatIdx, rev.names.join(' · '));
 
     this.addPlayChatBubbles(seatIdx, e);
+
+    const ekkahMeta = e.getLastEkkahPlayMeta();
+    if (ekkahMeta?.declared) {
+      const name = this.seats[seatIdx]?.name || `مقعد ${seatIdx + 1}`;
+      this.broadcast('ekkah_declared', { seat: seatIdx, name });
+    }
+
     this.broadcast('card_thrown', { player: seatIdx });
     this.broadcastState();
     this.scheduleBotTurn();
@@ -1317,6 +1484,92 @@ class GameManager {
     this.io = io;
   }
 
+  /** إنشاء غرفة مباراة بطولة وتجهيز مقاعد الفريقين ثم بدء المباراة. */
+  createTournamentMatchRoom(roomId, { tournamentId, matchId, team1 = [], team2 = [], initialScores, cardBackUrl, sessionBgUrl } = {}) {
+    const existing = this.rooms.get(roomId);
+    if (existing) return existing;
+    const room = this.getOrCreateRoom(roomId);
+    room.gameMode = 'tournament';
+    room.tournamentMatch = { tournamentId, matchId };
+    if (initialScores) room.tournamentInitialScores = initialScores;
+    if (cardBackUrl || sessionBgUrl) {
+      room.applyRoomCosmetics({ cardBackUrl, sessionBgUrl });
+    }
+    room.setupTournamentSeats(team1, team2);
+    return room;
+  }
+
+  /** إشعار أعضاء الفريق البطل بجائزتهم عبر السوكت (اختياري). */
+  notifyTournamentChampion(userIds = [], payload = {}) {
+    if (!this.io || !Array.isArray(userIds)) return;
+    const targets = new Set(userIds.map((u) => String(u)));
+    for (const [sid, info] of this.onlineRegistry) {
+      if (targets.has(String(info.user_id))) {
+        const sock = this.io.sockets.sockets.get(sid);
+        if (sock) sock.emit('tournament_champion', { ...payload, at: Date.now() });
+      }
+    }
+  }
+
+  // ── دوال لوحة الإدارة (شبكة/غرف فقط — لا تمس المحرك) ──
+  getAdminRooms() {
+    const rooms = [];
+    for (const [roomId, room] of this.rooms) {
+      const players = room.seats
+        .filter((s) => s && !s.isBot)
+        .map((s) => ({ name: s.name, userId: s.userId || null, disconnected: !!s.disconnected }));
+      const botCount = room.seats.filter((s) => s && s.isBot).length;
+      rooms.push({
+        roomId,
+        status: room.status,
+        gameMode: room.gameMode,
+        soloMode: !!room.soloMode,
+        sandboxMode: !!room.sandboxMode,
+        players,
+        player_count: players.length,
+        bot_count: botCount,
+        spectator_count: room.spectators ? room.spectators.size : 0,
+        stake: room.stake || 0,
+      });
+    }
+    return rooms;
+  }
+
+  killRoom(roomId) {
+    const room = this.rooms.get(roomId);
+    if (!room) return { error: 'الغرفة غير موجودة' };
+    room.abandonInactiveRoom({ reason: 'admin_closed' });
+    this.rooms.delete(roomId);
+    return { ok: true };
+  }
+
+  warnUser(userId, message) {
+    if (!this.io) return { error: 'الخادم غير متصل' };
+    const uid = userId != null ? String(userId) : null;
+    if (!uid) return { error: 'معرّف اللاعب مطلوب' };
+    let delivered = 0;
+    for (const [sid, info] of this.onlineRegistry) {
+      if (info.user_id === uid) {
+        const sock = this.io.sockets.sockets.get(sid);
+        if (sock) {
+          sock.emit('admin_warning', { message: String(message || '').slice(0, 500), at: Date.now() });
+          delivered++;
+        }
+      }
+    }
+    return { ok: true, delivered };
+  }
+
+  announce(message, level = 'info') {
+    if (!this.io) return { error: 'الخادم غير متصل' };
+    this.io.emit('admin_announcement', {
+      message: String(message || '').slice(0, 500),
+      level,
+      at: Date.now(),
+    });
+    return { ok: true };
+  }
+
   _emit(roomId, event, data, targetSocketId) {
     if (!this.io) return;
     if (targetSocketId) {
@@ -1330,7 +1583,7 @@ class GameManager {
   joinRoom(socket, data = {}) {
     let {
       roomId = 'friendly', name, seat = null, solo = false,
-      userId = null, cardBackUrl, sessionBgUrl, stake, seatOrder,
+      userId = null, cardBackUrl, sessionBgUrl, stake, seatOrder, spectate = false,
     } = data;
     const resolvedId = resolveJoinRoomId(roomId, {
       solo,
@@ -1338,8 +1591,53 @@ class GameManager {
       socketId: socket.id,
     });
     roomId = resolvedId;
+
+    // وضع الصيانة: منع دخول لاعبين جدد (يُستثنى الأدمن والدخول الفردي).
+    const { isMaintenanceOn, getMaintenance } = require('./adminDashboard');
+    if (isMaintenanceOn() && !solo) {
+      let isAdmin = false;
+      if (userId != null) {
+        try {
+          const { getUserById } = require('./auth');
+          isAdmin = getUserById(userId)?.role === 'admin';
+        } catch (_) {}
+      }
+      // نسمح لإعادة الاتصال بغرفة قائمة أثناء الصيانة، لكن نمنع إنشاء دخول جديد.
+      const existingRoom = this.rooms.get(roomId);
+      const canReconnect = existingRoom && userId != null
+        && existingRoom.findReconnectSeat(userId) >= 0;
+      if (!isAdmin && !canReconnect) {
+        return { error: getMaintenance().message || 'الخادم في وضع الصيانة حالياً' };
+      }
+    }
+
+    // مسار المشاهدة (Spectator) — لا يشغل مقعداً
+    if (spectate) {
+      const existing = this.rooms.get(roomId);
+      if (!existing || existing.status !== 'playing') {
+        return { error: 'لا توجد جلسة نشطة للمشاهدة' };
+      }
+      const specResult = existing.addSpectator(socket.id, name, userId);
+      if (specResult.error) return specResult;
+      socket.join(roomId);
+      socket.roomId = roomId;
+      this.registerOnline(socket, {
+        userId, name, roomId, roomStatus: existing.status, gameMode: existing.gameMode,
+      });
+      if (existing.engine) {
+        socket.emit('game_public', existing.getPublicState());
+      }
+      return {
+        spectator: true,
+        room: existing.getRoomState(),
+        roomId: existing.roomId,
+        gameMode: existing.gameMode,
+      };
+    }
+
     let room = this.getOrCreateRoom(roomId);
-    if (!solo && !isBotPracticeRoomId(roomId) && room.isOrphaned()) {
+    // غرف البطولة مُجهّزة مسبقاً بمقاعد محجوزة (لاعبون غير متصلين) — لا تُهجَر عند أول دخول.
+    if (!solo && !isBotPracticeRoomId(roomId) && !isTournamentRoomId(roomId) && room.isOrphaned()) {
       room.abandonInactiveRoom();
       room = this.getOrCreateRoom(roomId);
     }
@@ -1423,6 +1721,15 @@ class GameManager {
     if (!roomId) return null;
     const room = this.rooms.get(roomId);
     if (!room) return null;
+
+    // مشاهد يغادر — لا يؤثر على اللاعبين
+    if (room.isSpectator(socket.id)) {
+      room.removeSpectator(socket.id);
+      this.unregisterOnline(socket.id);
+      socket.leave(roomId);
+      socket.roomId = null;
+      return { type: 'spectator_left' };
+    }
 
     const result = room.removePlayer(socket.id, options);
     this.unregisterOnline(socket.id);

@@ -2,10 +2,17 @@ const { db } = require('./db');
 const { playerRowToCard } = require('./chat');
 const { getEquippedCardDeck } = require('./bag');
 const { getSeatMeta } = require('./playerMeta');
+const { distributeRecreationalTournamentPoints } = require('./tournamentRewards');
 
 const REGISTRATION_MS = 5 * 60 * 1000;
 const LOBBY_MS = 60 * 1000;
 const MIN_PLAYERS = 8;
+
+// مرجع لمدير اللعبة — يُسجّل من index.js لإنشاء غرف مباريات البطولة (بدون المساس بالمحرك).
+let _gameManager = null;
+function setTournamentGameManager(gm) {
+  _gameManager = gm;
+}
 
 const PHASE_LABELS = {
   registration: 'تسجيل مفتوح',
@@ -99,6 +106,26 @@ function initTournamentEngineSchema() {
   try { db.exec('ALTER TABLE tournament_entries ADD COLUMN team_id INTEGER'); } catch (_) {}
   try { db.exec('ALTER TABLE tournament_entries ADD COLUMN checked_in INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   try { db.exec('ALTER TABLE tournament_entries ADD COLUMN checked_in_at TEXT'); } catch (_) {}
+  // ربط كل مباراة بغرفة لعب حقيقية + وقت البدء.
+  try { db.exec('ALTER TABLE tournament_matches ADD COLUMN room_id TEXT'); } catch (_) {}
+  try { db.exec('ALTER TABLE tournament_matches ADD COLUMN started_at TEXT'); } catch (_) {}
+  try { db.exec('ALTER TABLE tournaments ADD COLUMN custom_deck_key TEXT DEFAULT \'\''); } catch (_) {}
+  try { db.exec('ALTER TABLE tournaments ADD COLUMN custom_bg_key TEXT DEFAULT \'\''); } catch (_) {}
+}
+
+/** أكبر قوة للعدد 2 لا تتجاوز n (لبناء شجرة متوازنة 2/4/8/16/32). */
+function nearestPow2Floor(n) {
+  let p = 1;
+  while (p * 2 <= n) p *= 2;
+  return p;
+}
+
+/** أعضاء فريق (معرّفات اللاعبين) بترتيب الانضمام. */
+function teamUserIds(teamId) {
+  if (!teamId) return [];
+  return db.prepare(`
+    SELECT user_id FROM tournament_entries WHERE team_id = ? ORDER BY joined_at ASC
+  `).all(teamId).map((r) => r.user_id);
 }
 
 function shuffle(arr) {
@@ -177,6 +204,28 @@ function roundLabels(teamCount) {
   return labels;
 }
 
+function isFinalMatch(tournamentId, match) {
+  const parent = db.prepare(`
+    SELECT id FROM tournament_matches
+    WHERE tournament_id = ? AND round_index = ? AND match_index = ?
+  `).get(tournamentId, match.round_index + 1, Math.floor(match.match_index / 2));
+  return !parent;
+}
+
+function getTournamentMatchRoomOptions(tournamentId, match) {
+  const t = db.prepare('SELECT size, type, custom_deck_key, custom_bg_key FROM tournaments WHERE id = ?')
+    .get(tournamentId);
+  const opts = {};
+  if (t?.type === 'casual' && (t.size === 32 || t.size === 64) && !isFinalMatch(tournamentId, match)) {
+    opts.initialScores = { 1: 52, 2: 52 };
+  }
+  const { resolveTournamentCosmetics } = require('./bag');
+  const cos = resolveTournamentCosmetics(t.custom_deck_key || '', t.custom_bg_key || '');
+  if (cos.cardBackUrl) opts.cardBackUrl = cos.cardBackUrl;
+  if (cos.sessionBgUrl) opts.sessionBgUrl = cos.sessionBgUrl;
+  return opts;
+}
+
 function buildBracketMatches(tournamentId, teamIds) {
   db.prepare('DELETE FROM tournament_matches WHERE tournament_id = ?').run(tournamentId);
   const n = teamIds.length;
@@ -246,7 +295,9 @@ function formTeams(tournamentId) {
   db.prepare('UPDATE tournament_entries SET team_id = NULL, checked_in = 0, checked_in_at = NULL WHERE tournament_id = ?')
     .run(tournamentId);
 
-  const teamCount = Math.floor(entries.length / 2);
+  // تكوين ذكي: عدد الفرق يجب أن يكون قوة للعدد 2 (2/4/8/16/32) لتُبنى شجرة خروج المغلوب
+  // بشكل متوازن مع 8/16/32/64 لاعباً. أي فائض من اللاعبين يبقى مسجّلاً كاحتياط دون فريق.
+  const teamCount = nearestPow2Floor(Math.floor(entries.length / 2));
   const teamIds = [];
   for (let i = 0; i < teamCount; i++) {
     const name = `فريق ${i + 1}`;
@@ -264,11 +315,23 @@ function formTeams(tournamentId) {
   return teamIds;
 }
 
+/** تسجيل دخول تلقائي لحسابات البوت (لا تضغط "ادخل الآن"). */
+function autoCheckInBots(tournamentId) {
+  db.prepare(`
+    UPDATE tournament_entries
+    SET checked_in = 1, checked_in_at = COALESCE(checked_in_at, datetime('now'))
+    WHERE tournament_id = ? AND checked_in = 0 AND user_id IN (
+      SELECT id FROM users WHERE role = 'bot'
+    )
+  `).run(tournamentId);
+}
+
 function startLobbyPhase(tournamentId) {
   db.prepare(`
     UPDATE tournaments SET status = 'lobby', lobby_ends_at = ? WHERE id = ?
   `).run(isoAfter(LOBBY_MS), tournamentId);
   formTeams(tournamentId);
+  autoCheckInBots(tournamentId);
 }
 
 function startActivePhase(tournamentId) {
@@ -278,6 +341,166 @@ function startActivePhase(tournamentId) {
   db.prepare(`
     UPDATE tournaments SET status = 'active', started_at = datetime('now'), lobby_ends_at = NULL WHERE id = ?
   `).run(tournamentId);
+  // ابدأ غرف الجولة الأولى فعلياً على طاولات اللعب.
+  createRoundRooms(tournamentId, 0);
+}
+
+/** إنشاء غرف اللعب الحقيقية لكل مباراة جاهزة في جولة معيّنة. */
+function createRoundRooms(tournamentId, roundIndex) {
+  const matches = db.prepare(`
+    SELECT * FROM tournament_matches
+    WHERE tournament_id = ? AND round_index = ? AND winner_team_id IS NULL
+  `).all(tournamentId, roundIndex);
+
+  for (const m of matches) {
+    // مقعد فارغ (bye): الفريق الوحيد يتأهل تلقائياً.
+    if (m.team1_id && !m.team2_id) {
+      reportMatchResult(tournamentId, m.id, m.team1_id, { bye: true });
+      continue;
+    }
+    if (!m.team1_id || !m.team2_id) continue; // لم تكتمل بعد
+    if (m.room_id) continue; // الغرفة موجودة
+
+    const roomId = `tourney_${tournamentId}_${m.id}`;
+    db.prepare(`
+      UPDATE tournament_matches SET room_id = ?, status = 'active', started_at = datetime('now') WHERE id = ?
+    `).run(roomId, m.id);
+
+    if (_gameManager && typeof _gameManager.createTournamentMatchRoom === 'function') {
+      try {
+        const roomOpts = getTournamentMatchRoomOptions(tournamentId, m);
+        _gameManager.createTournamentMatchRoom(roomId, {
+          tournamentId,
+          matchId: m.id,
+          team1: teamUserIds(m.team1_id),
+          team2: teamUserIds(m.team2_id),
+          ...roomOpts,
+        });
+      } catch (e) {
+        // في حال فشل إنشاء الغرفة لا نكسر التزامن — تبقى المباراة قابلة لإعادة المحاولة.
+        db.prepare('UPDATE tournament_matches SET room_id = NULL, status = ? WHERE id = ?')
+          .run('pending', m.id);
+      }
+    }
+  }
+}
+
+/**
+ * استلام نتيجة مباراة من محرك اللعب (فريق engine 1 = مقاعد 0,2 / فريق 2 = مقاعد 1,3).
+ * يُستدعى من gameManager عند انتهاء المباراة (match_over).
+ */
+function onTournamentMatchOver(tournamentId, matchId, engineWinnerTeam, scores = {}) {
+  const m = db.prepare('SELECT * FROM tournament_matches WHERE id = ? AND tournament_id = ?')
+    .get(matchId, tournamentId);
+  if (!m || m.winner_team_id) return;
+  const winnerTeamId = engineWinnerTeam === 2 ? m.team2_id : m.team1_id;
+  reportMatchResult(tournamentId, matchId, winnerTeamId, {
+    score1: scores?.[1] ?? null,
+    score2: scores?.[2] ?? null,
+  });
+}
+
+/** تسجيل الفائز وترقيته للدور التالي، وإنشاء غرفة الدور التالي عند اكتمالها. */
+function reportMatchResult(tournamentId, matchId, winnerTeamId, opts = {}) {
+  const m = db.prepare('SELECT * FROM tournament_matches WHERE id = ? AND tournament_id = ?')
+    .get(matchId, tournamentId);
+  if (!m || m.winner_team_id || !winnerTeamId) return;
+
+  db.prepare(`
+    UPDATE tournament_matches
+    SET winner_team_id = ?, status = 'completed', score1 = ?, score2 = ?
+    WHERE id = ?
+  `).run(winnerTeamId, opts.score1 ?? null, opts.score2 ?? null, matchId);
+
+  const parentRound = m.round_index + 1;
+  const parentIndex = Math.floor(m.match_index / 2);
+  const parent = db.prepare(`
+    SELECT * FROM tournament_matches
+    WHERE tournament_id = ? AND round_index = ? AND match_index = ?
+  `).get(tournamentId, parentRound, parentIndex);
+
+  if (!parent) {
+    // كانت المباراة النهائية → الفائز هو البطل.
+    completeTournament(tournamentId, winnerTeamId);
+    return;
+  }
+
+  const slotCol = m.match_index % 2 === 0 ? 'team1_id' : 'team2_id';
+  db.prepare(`UPDATE tournament_matches SET ${slotCol} = ? WHERE id = ?`).run(winnerTeamId, parent.id);
+
+  const updated = db.prepare('SELECT * FROM tournament_matches WHERE id = ?').get(parent.id);
+  if (updated.team1_id && updated.team2_id) {
+    createRoundRooms(tournamentId, parentRound);
+  }
+}
+
+/** إنهاء البطولة ومنح الفائزين ITEM في الحقيبة + مكافأة عملات. */
+function completeTournament(tournamentId, championTeamId) {
+  db.prepare(`
+    UPDATE tournaments SET status = 'completed', completed_at = datetime('now') WHERE id = ?
+  `).run(tournamentId);
+
+  const t = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournamentId);
+  const members = teamUserIds(championTeamId);
+
+  if (t?.type === 'casual') {
+    try {
+      distributeRecreationalTournamentPoints(tournamentId, championTeamId);
+    } catch (_) { /* لا نكسر إنهاء البطولة */ }
+  }
+
+  const itemKey = `tourney_champion_${tournamentId}`;
+  const label = `🏆 بطل ${t?.title || 'البطولة'}`;
+  const imageUrl = '/cards/kingofd.jpg';
+  const coinsReward = t?.type === 'pro' ? 5000 : 1500;
+
+  for (const uid of members) {
+    try {
+      const { grantAchievement } = require('./bag');
+      grantAchievement(uid, itemKey, label, imageUrl);
+    } catch (_) { /* لا نكسر إنهاء البطولة */ }
+    try {
+      const { getOrCreatePlayer, savePlayer } = require('./db');
+      const p = getOrCreatePlayer(`user_${uid}`, '');
+      if (p) {
+        p.coins = (p.coins || 0) + coinsReward;
+        savePlayer(p);
+      }
+    } catch (_) { /* المكافأة اختيارية */ }
+  }
+
+  // إشعار البطل عبر السوكت إن أمكن.
+  if (_gameManager && typeof _gameManager.notifyTournamentChampion === 'function') {
+    try {
+      _gameManager.notifyTournamentChampion(members, { tournamentId, title: t?.title, itemLabel: label, coins: coinsReward });
+    } catch (_) {}
+  }
+}
+
+/** المباراة الحالية للاعب (غرفة جاهزة للدخول). */
+function getUserActiveMatch(tournamentId, userId) {
+  if (!userId) return null;
+  const row = db.prepare(`
+    SELECT tm.* FROM tournament_matches tm
+    JOIN tournament_entries e
+      ON (e.team_id = tm.team1_id OR e.team_id = tm.team2_id)
+    WHERE tm.tournament_id = ? AND e.user_id = ?
+      AND tm.status = 'active' AND tm.room_id IS NOT NULL AND tm.winner_team_id IS NULL
+    ORDER BY tm.round_index DESC LIMIT 1
+  `).get(tournamentId, userId);
+  if (!row) return null;
+  return { room_id: row.room_id, match_id: row.id, round_index: row.round_index };
+}
+
+/** مباراة حية قابلة للمشاهدة (للزر "مشاهدة"). */
+function getWatchableMatch(tournamentId) {
+  const row = db.prepare(`
+    SELECT * FROM tournament_matches
+    WHERE tournament_id = ? AND status = 'active' AND room_id IS NOT NULL AND winner_team_id IS NULL
+    ORDER BY round_index DESC, match_index ASC LIMIT 1
+  `).get(tournamentId);
+  if (!row) return null;
+  return { room_id: row.room_id, match_id: row.id, round_index: row.round_index };
 }
 
 function cancelTournament(tournamentId, reason) {
@@ -285,6 +508,68 @@ function cancelTournament(tournamentId, reason) {
     UPDATE tournaments SET status = 'cancelled', completed_at = datetime('now') WHERE id = ?
   `).run(tournamentId);
   return reason;
+}
+
+/** حذف البطولات المنتهية/الملغاة من القاعدة حتى لا تظهر في القائمة. */
+function purgeEndedTournaments() {
+  const ids = db.prepare(`
+    SELECT id FROM tournaments WHERE status IN ('cancelled', 'completed', 'closed')
+  `).all().map((r) => r.id);
+  for (const id of ids) {
+    db.prepare('DELETE FROM tournament_matches WHERE tournament_id = ?').run(id);
+    db.prepare('DELETE FROM tournament_teams WHERE tournament_id = ?').run(id);
+    db.prepare('DELETE FROM tournament_entries WHERE tournament_id = ?').run(id);
+    db.prepare('DELETE FROM tournaments WHERE id = ?').run(id);
+  }
+  return ids.length;
+}
+
+function finishRegistrationOnTimeout(tournamentId) {
+  const t = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournamentId);
+  if (!t || t.status !== 'registration') return t;
+
+  const count = db.prepare('SELECT COUNT(*) AS c FROM tournament_entries WHERE tournament_id = ?')
+    .get(tournamentId).c;
+
+  if (count >= t.size) {
+    startTournament(tournamentId);
+    return db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournamentId);
+  }
+
+  if (count <= 1) {
+    cancelTournament(tournamentId, 'انتهى وقت التسجيل — لم ينضم أحد');
+  } else if (count < MIN_PLAYERS) {
+    cancelTournament(tournamentId, 'لاعبون غير كافيين');
+  } else {
+    cancelTournament(tournamentId, 'لم يكتمل العدد قبل انتهاء التسجيل');
+  }
+  return db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournamentId);
+}
+
+function startTournament(tournamentId) {
+  const t = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournamentId);
+  if (!t || t.status !== 'registration') return t;
+
+  const count = db.prepare('SELECT COUNT(*) AS c FROM tournament_entries WHERE tournament_id = ?')
+    .get(tournamentId).c;
+  if (count < t.size) return t;
+
+  if (count < MIN_PLAYERS || count < 4) {
+    cancelTournament(tournamentId, 'لاعبون غير كافيين');
+  } else if (count % 2 !== 0) {
+    const last = db.prepare(`
+      SELECT user_id FROM tournament_entries WHERE tournament_id = ?
+      ORDER BY joined_at DESC LIMIT 1
+    `).get(tournamentId);
+    if (last) {
+      db.prepare('DELETE FROM tournament_entries WHERE tournament_id = ? AND user_id = ?')
+        .run(tournamentId, last.user_id);
+    }
+    startLobbyPhase(tournamentId);
+  } else {
+    startLobbyPhase(tournamentId);
+  }
+  return db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournamentId);
 }
 
 function syncTournamentPhase(tournamentId) {
@@ -298,22 +583,13 @@ function syncTournamentPhase(tournamentId) {
     const count = db.prepare('SELECT COUNT(*) AS c FROM tournament_entries WHERE tournament_id = ?').get(tournamentId).c;
     const full = count >= t.size;
     const timeUp = ends && now >= ends;
-    if (full || timeUp) {
-      if (count < MIN_PLAYERS || count < 4) {
-        cancelTournament(tournamentId, 'لاعبون غير كافيين');
-      } else if (count % 2 !== 0) {
-        const last = db.prepare(`
-          SELECT user_id FROM tournament_entries WHERE tournament_id = ?
-          ORDER BY joined_at DESC LIMIT 1
-        `).get(tournamentId);
-        if (last) db.prepare('DELETE FROM tournament_entries WHERE tournament_id = ? AND user_id = ?')
-          .run(tournamentId, last.user_id);
-        startLobbyPhase(tournamentId);
-      } else {
-        startLobbyPhase(tournamentId);
-      }
+    if (full) {
+      startTournament(tournamentId);
+    } else if (timeUp) {
+      finishRegistrationOnTimeout(tournamentId);
     }
   } else if (t.status === 'lobby') {
+    autoCheckInBots(tournamentId); // البوتات تُعتبر داخلة دائماً
     const ends = t.lobby_ends_at ? new Date(t.lobby_ends_at).getTime() : 0;
     if (ends && now >= ends) {
       const entries = getEntries(tournamentId);
@@ -323,11 +599,12 @@ function syncTournamentPhase(tournamentId) {
           db.prepare('DELETE FROM tournament_entries WHERE tournament_id = ? AND user_id = ?')
             .run(tournamentId, e.user_id);
         });
+        formTeams(tournamentId);
+        autoCheckInBots(tournamentId);
         const remaining = getEntries(tournamentId);
         if (remaining.length < MIN_PLAYERS || remaining.length < 4) {
           cancelTournament(tournamentId, 'لم يدخل الجميع في الوقت المحدد');
         } else {
-          formTeams(tournamentId);
           startActivePhase(tournamentId);
         }
       } else {
@@ -342,6 +619,7 @@ function syncTournamentPhase(tournamentId) {
 function syncAllTournaments() {
   const rows = db.prepare(`SELECT id FROM tournaments WHERE status IN ('registration', 'lobby')`).all();
   for (const r of rows) syncTournamentPhase(r.id);
+  purgeEndedTournaments();
 }
 
 function enrichTournamentRow(row, viewerId) {
@@ -418,6 +696,8 @@ function getTournamentDetail(tournamentId, viewerId) {
   `).get(tournamentId);
   if (!row) return null;
 
+  const myMatch = viewerId ? getUserActiveMatch(tournamentId, viewerId) : null;
+  const watchMatch = getWatchableMatch(tournamentId);
   const base = {
     ...row,
     ...tournamentPublicLabels(row),
@@ -426,6 +706,9 @@ function getTournamentDetail(tournamentId, viewerId) {
     title: row.title,
     creator_name: row.creator_name,
     creator: getTournamentCreatorCard(row.creator_id, viewerId),
+    my_match: myMatch,
+    watch_match: watchMatch,
+    can_watch: !!watchMatch,
   };
   const teams = getTeams(tournamentId, viewerId);
   const bracket = base.status === 'active' || base.status === 'completed'
@@ -455,4 +738,11 @@ module.exports = {
   getTournamentCreatorCard,
   tournamentSummaryFields,
   getTeams,
+  setTournamentGameManager,
+  onTournamentMatchOver,
+  reportMatchResult,
+  startTournament,
+  createRoundRooms,
+  getUserActiveMatch,
+  getWatchableMatch,
 };

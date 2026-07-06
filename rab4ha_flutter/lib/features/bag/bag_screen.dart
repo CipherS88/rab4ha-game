@@ -17,6 +17,8 @@ class _BagScreenState extends ConsumerState<BagScreen> with SingleTickerProvider
   late final TabController _tabs;
   List<dynamic> _storeItems = [];
   List<dynamic> _achievements = [];
+  List<dynamic> _badges = [];
+  Map<String, dynamic>? _tournamentPoints;
   var _loading = true;
 
   @override
@@ -35,6 +37,9 @@ class _BagScreenState extends ConsumerState<BagScreen> with SingleTickerProvider
       setState(() {
         _storeItems = data['store_items'] as List? ?? [];
         _achievements = data['achievements'] as List? ?? [];
+        _badges = data['badges'] as List? ?? [];
+        final tp = data['tournament_points'];
+        _tournamentPoints = tp is Map ? Map<String, dynamic>.from(tp) : null;
         _loading = false;
       });
     } catch (e) {
@@ -106,11 +111,27 @@ class _BagScreenState extends ConsumerState<BagScreen> with SingleTickerProvider
                   },
                 ),
                 ListView.builder(
-                  itemCount: _achievements.length,
+                  itemCount: _achievements.length + _badges.length + (_tournamentPoints != null ? 1 : 0),
                   itemBuilder: (_, i) {
-                    final a = _achievements[i] as Map;
+                    if (_tournamentPoints != null && i == 0) {
+                      return ListTile(
+                        leading: const Text('🏅', style: TextStyle(fontSize: 28)),
+                        title: Text(_tournamentPoints!['label']?.toString() ?? 'نقاط البطولات'),
+                        subtitle: const Text('غير قابل للتداول أو البيع'),
+                      );
+                    }
+                    final offset = (_tournamentPoints != null ? 1 : 0);
+                    if (i - offset < _badges.length) {
+                      final b = _badges[i - offset] as Map;
+                      return ListTile(
+                        leading: const Icon(Icons.military_tech, color: Colors.amber),
+                        title: Text(b['label']?.toString() ?? 'شارة'),
+                        subtitle: const Text('شارة بطولة — غير قابلة للتداول'),
+                      );
+                    }
+                    final a = _achievements[i - offset - _badges.length] as Map;
                     return ListTile(
-                      title: Text(a['name']?.toString() ?? ''),
+                      title: Text(a['label']?.toString() ?? a['name']?.toString() ?? ''),
                       subtitle: Text(a['description']?.toString() ?? ''),
                       trailing: a['earned'] == true ? const Icon(Icons.check, color: Colors.green) : null,
                     );

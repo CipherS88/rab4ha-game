@@ -16,6 +16,7 @@ const {
   listTournaments,
   createTournament,
   joinTournament,
+  fillTournamentWithBots,
   getCasualQuota,
   getCasualLimit,
   getInventory,
@@ -238,7 +239,23 @@ function createTournamentsRouter() {
   const {
     enterTournamentLobby,
     getTournamentDetail,
+    getWatchableMatch,
   } = require('./tournamentEngine');
+  const { createJoinCaptcha } = require('./tournamentCaptcha');
+  const { TOURNAMENT_CREATE_FEE, TOURNAMENT_CUSTOMIZE_FEE } = require('./tournamentConstants');
+
+  router.get('/meta/fees', (_req, res) => {
+    res.json({
+      create_fee: TOURNAMENT_CREATE_FEE,
+      customize_fee: TOURNAMENT_CUSTOMIZE_FEE,
+      sizes: VALID_SIZES,
+      formats: VALID_FORMATS,
+    });
+  });
+
+  router.get('/captcha', (_req, res) => {
+    res.json(createJoinCaptcha());
+  });
 
   router.get('/', (req, res) => {
     const type = req.query.type || null;
@@ -259,15 +276,43 @@ function createTournamentsRouter() {
     res.json(result);
   });
 
+  // مباراة حية للمشاهدة (زر "مشاهدة").
+  router.get('/:id/watch', (req, res) => {
+    const match = getWatchableMatch(parseInt(req.params.id, 10));
+    if (!match) return res.status(404).json({ error: 'لا توجد مباراة حية للمشاهدة الآن' });
+    res.json(match);
+  });
+
   router.post('/', (req, res) => {
-    const { type, title, size, match_format } = req.body || {};
-    const result = createTournament(req.user, { type, title, size: parseInt(size, 10), match_format });
+    const { type, title, size, match_format, custom_deck_key, custom_bg_key } = req.body || {};
+    const result = createTournament(req.user, {
+      type,
+      title,
+      size: parseInt(size, 10),
+      match_format,
+      custom_deck_key,
+      custom_bg_key,
+    });
     if (result.error) return res.status(400).json({ error: result.error });
     res.json(result);
   });
 
   router.post('/:id/join', (req, res) => {
-    const result = joinTournament(req.user, parseInt(req.params.id, 10));
+    const { captcha_token, captcha_answer } = req.body || {};
+    const result = joinTournament(req.user, parseInt(req.params.id, 10), {
+      captcha_token,
+      captcha_answer,
+    });
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.json(result);
+  });
+
+  // ملء البطولة بالبوتات — للأدمن فقط (اختبار).
+  router.post('/:id/fill-bots', (req, res) => {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ error: 'هذه الخاصية للأدمن فقط' });
+    }
+    const result = fillTournamentWithBots(parseInt(req.params.id, 10));
     if (result.error) return res.status(400).json({ error: result.error });
     res.json(result);
   });

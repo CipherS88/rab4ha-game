@@ -24,11 +24,19 @@ class NetworkAssetImage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final url = ref.read(apiClientProvider).assetUrl(path);
+    // حدّ فك التشفير في الذاكرة بحجم العرض الفعلي لتقليل التقطيع (Jank) والذاكرة.
+    final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
+    final memW = width != null && width!.isFinite ? (width! * dpr).round() : null;
     return CachedNetworkImage(
       imageUrl: url,
       width: width,
       height: height,
       fit: fit,
+      // إلغاء أنميشن التلاشي يمنع القفزات أثناء اللعب السريع.
+      fadeInDuration: Duration.zero,
+      fadeOutDuration: Duration.zero,
+      filterQuality: FilterQuality.medium,
+      memCacheWidth: memW,
       errorWidget: (_, __, ___) =>
           errorWidget ??
           Container(

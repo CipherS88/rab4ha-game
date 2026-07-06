@@ -12,12 +12,13 @@ const PROJECT_RAW_PTS = {
   سرا: [20, 20], خمسين: [50, 50], مية: [100, 100], أربعمية: [200, 0], بلوت: [0, 20],
 };
 
-/** ثوابت نهاية الجولة — حسب rules المحددة */
+/** ثوابت نهاية الجولة — خريطة Rab4ha Scoring Logic (ثابتة) */
 const SCORING = {
   KAPUT_BASE: { SUN: 44, HAKAM: 25 },
+  FALL_BASE: { SUN: 30, HAKAM: 16 },
   DOUBLE_POINTS_BASE: 16,
-  SUN_OVER100_DOUBLE: 60,
-  GAHWA_POINTS: 152,
+  GAHWA_POINTS: 150,
+  MATCH_WIN: 152,
 };
 
 function abnatToBoardScore(abnatPts, isSun) {
@@ -32,16 +33,55 @@ function kaputBaseScore(isSun) {
   return isSun ? SCORING.KAPUT_BASE.SUN : SCORING.KAPUT_BASE.HAKAM;
 }
 
+function fallBaseScore(isSun) {
+  return isSun ? SCORING.FALL_BASE.SUN : SCORING.FALL_BASE.HAKAM;
+}
+
+function teamCombinedAbnat(rawTricks, groundPts, rawProj, team) {
+  return rawTricks[team] + groundPts[team] + rawProj[team];
+}
+
+/** فريق المقعد: 0,2 → 1 | 1,3 → 2 */
+function seatToTeam(seat) {
+  return seat % 2 === 0 ? 1 : 2;
+}
+
+/** جبر الستة — خصم 5 أبناط خام من المشتري وإضافتها للمدافع عند التعادل (لعب عادي فقط). */
+function applyJabirOnRawTie(abnat, buyerTeam) {
+  if (abnat[1] !== abnat[2]) return false;
+  const defender = buyerTeam === 1 ? 2 : 1;
+  abnat[buyerTeam] -= 5;
+  abnat[defender] += 5;
+  return true;
+}
+
 /**
- * تسوية جولة عادية (بدون كبوت/سوا/قيد) بعد التجبير.
- * @returns {{ scores: {1:number,2:number}, is_fall: boolean }}
+ * نقاط اللوحة المضاعفة — دبل (2): أكلات+أرض+مشاريع ×2.
+ * ثري/فور (3/4) في الحكم: أكلات+أرض × المضاعف، المشاريع 1x منفصلة.
+ */
+function multipliedTeamBoard(rawTricks, groundPts, rawProj, team, isSun, mult) {
+  const tricksGround = rawTricks[team] + groundPts[team];
+  const projects = rawProj[team];
+  if (!isSun && mult >= 3) {
+    return abnatToBoardScore(tricksGround * mult, isSun) + projectsBoardScore(projects, isSun);
+  }
+  return abnatToBoardScore((tricksGround + projects) * mult, isSun);
+}
+
+/**
+ * تسوية جولة عادية أو سوا (بدون كبوت/قيد).
+ * @returns {{ scores: {1:number,2:number}, is_fall: boolean }}  is_fall = خسارة المشتري
  */
 function settleNormalRound({
+  isSun,
   baseFinal,
   buyerTeam,
+  rawTricks,
+  groundPts,
+  rawProj,
   isDoubled,
   doubleLevel,
-  sunOver100Special,
+  doublerTeam = null,
 }) {
   const buyer = buyerTeam;
   const defender = buyer === 1 ? 2 : 1;
@@ -49,34 +89,64 @@ function settleNormalRound({
   const dScore = baseFinal[defender];
   const scores = { 1: 0, 2: 0 };
   let isFall = false;
+  const defenderProjBoard = projectsBoardScore(rawProj[defender], isSun);
+  const lossBase = fallBaseScore(isSun);
+  const rawTotal = {
+    1: teamCombinedAbnat(rawTricks, groundPts, rawProj, 1),
+    2: teamCombinedAbnat(rawTricks, groundPts, rawProj, 2),
+  };
+  const isRawTie = rawTotal[1] === rawTotal[2];
 
   if (isDoubled) {
     if (doubleLevel === 5) {
+      if (isRawTie && doublerTeam != null) {
+        const winner = 3 - doublerTeam;
+        scores[winner] = SCORING.GAHWA_POINTS;
+        if (doublerTeam === buyer) isFall = true;
+        return { scores, is_fall: isFall };
+      }
       const winner = bScore > dScore ? buyer : dScore > bScore ? defender : buyer;
       scores[winner] = SCORING.GAHWA_POINTS;
       if (winner === defender) isFall = true;
       return { scores, is_fall: isFall };
     }
-    if (sunOver100Special && doubleLevel === 2) {
-      const winner = bScore > dScore ? buyer : defender;
-      scores[winner] = SCORING.SUN_OVER100_DOUBLE;
-      if (winner === defender) isFall = true;
+
+    const mult = doubleLevel;
+
+    // تعادل الأبناط في التدبيل — الخاسر هو آخر من طلب التحدي (المدبل).
+    if (isRawTie && doublerTeam != null) {
+      const loserTeam = doublerTeam;
+      const winnerTeam = 3 - loserTeam;
+      scores[loserTeam] = 0;
+      scores[winnerTeam] = multipliedTeamBoard(rawTricks, groundPts, rawProj, winnerTeam, isSun, mult);
+      if (loserTeam === buyer) isFall = true;
       return { scores, is_fall: isFall };
     }
-    const pts = SCORING.DOUBLE_POINTS_BASE * doubleLevel;
-    const winner = bScore > dScore ? buyer : defender;
-    scores[winner] = pts;
-    if (winner === defender || bScore <= dScore) isFall = true;
+
+    const buyerWins = bScore > dScore;
+
+    if (buyerWins) {
+      scores[1] = multipliedTeamBoard(rawTricks, groundPts, rawProj, 1, isSun, mult);
+      scores[2] = multipliedTeamBoard(rawTricks, groundPts, rawProj, 2, isSun, mult);
+      return { scores, is_fall: false };
+    }
+
+    isFall = true;
+    scores[buyer] = 0;
+    scores[defender] = lossBase * mult + defenderProjBoard;
     return { scores, is_fall: isFall };
   }
 
   if (bScore > dScore) {
     scores[1] = baseFinal[1];
     scores[2] = baseFinal[2];
-  } else {
-    scores[defender] = baseFinal[1] + baseFinal[2];
-    isFall = true;
+    return { scores, is_fall: false };
   }
+
+  // خسارة المشتري (تعادل بعد جبر الستة أو أقل)
+  isFall = true;
+  scores[buyer] = 0;
+  scores[defender] = lossBase + defenderProjBoard;
   return { scores, is_fall: isFall };
 }
 
@@ -97,14 +167,18 @@ const GamePhase = {
 
 const QAID_REASONS = {
   SUN: ['قاطع', 'سوا غلط'],
-  HAKAM: ['قاطع', 'ربع في المقفل', 'ما كبر بالحكم', 'سوا غلط', 'ما دق بالحكم'],
+  HAKAM: ['قاطع', 'ربع في المقفل', 'ما كبر بالحكم', 'سوا غلط', 'ما دق بالحكم', 'إكة خاطئة'],
 };
 
 const QAID_NEEDS_PROOF = new Set(['قاطع', 'ما كبر بالحكم', 'ما دق بالحكم', 'ربع في المقفل']);
 
 const QAID_REASON_ALIASES = {
   'سوا خاطئ': 'سوا غلط',
+  sawa_ghalat: 'سوا غلط',
+  'sawa ghalat': 'سوا غلط',
   'ما كبر بحكم': 'ما كبر بالحكم',
+  wrong_ekkah: 'إكة خاطئة',
+  'wrong ekkah': 'إكة خاطئة',
 };
 
 function normalizeQaidReason(reason) {
@@ -182,6 +256,7 @@ class BalootEngine {
     this.trick_akka_player = null;
     this.trick_history = [];
     this.mistakes = [];
+    this.wrong_ekkah_violations = [];
     this.sawa_declaration = null;
     this.hands_revealed = false;
     this.played_in_trick1 = { 0: false, 1: false, 2: false, 3: false };
@@ -285,6 +360,7 @@ class BalootEngine {
     this.trick_akka_player = null;
     this.trick_history = [];
     this.mistakes = [];
+    this.wrong_ekkah_violations = [];
     this.sawa_declaration = null;
     this.hands_revealed = false;
     this.played_in_trick1 = { 0: false, 1: false, 2: false, 3: false };
@@ -344,6 +420,7 @@ class BalootEngine {
     this.trick_akka_player = null;
     this.trick_history = [];
     this.mistakes = [];
+    this.wrong_ekkah_violations = [];
     this.hands_revealed = true;
     this.played_in_trick1 = { 0: false, 1: false, 2: false, 3: false };
     this.played_in_trick2 = { 0: false, 1: false, 2: false, 3: false };
@@ -387,19 +464,36 @@ class BalootEngine {
 
   getPlayChatBubbles(player_idx, card) {
     const msgs = [];
-    // إكة: بداية أكلة في حكم — كرت غير حكم وليس آس وأقوى متبقٍ في سلسلته
-    if (
-      this.bid.type === 'HAKAM'
-      && this.current_trick.length === 0
-      && card.suit !== this.bid.suit
-      && card.rank !== 'A'
-      && this.is_akka(card)
-    ) {
-      msgs.push('اكه');
-    }
     const baloot = this._onBalootCardPlayed(player_idx, card);
     if (baloot) msgs.push(baloot);
     return msgs;
+  }
+
+  /** إعلان إكة يدوي — لا يوقف اللعب؛ مخالفة خاطئة تُسجّل مخفياً */
+  _registerEkkahDeclaration(player_idx, card) {
+    if (this.bid.type !== 'HAKAM' || !this.bid.suit) return { declared: false };
+    if (this.current_trick.length > 0) return { declared: false };
+    const trump = this.bid.suit;
+    const isWrong = card.suit === trump || !this.is_akka(card);
+    if (isWrong) {
+      this.wrong_ekkah_violations.push({
+        seat: player_idx,
+        team: this.seatTeam(player_idx),
+        card: { suit: card.suit, rank: card.rank },
+        trick_count: this.trick_count,
+      });
+      return { declared: true, wrong: true };
+    }
+    return { declared: true, wrong: false };
+  }
+
+  /** آخر مخالفة إكة خاطئة للفريق المعترض عليه */
+  _findWrongEkkahViolation(objector_team) {
+    for (let i = this.wrong_ekkah_violations.length - 1; i >= 0; i -= 1) {
+      const v = this.wrong_ekkah_violations[i];
+      if (v.team !== objector_team) return v;
+    }
+    return null;
   }
 
   getLastPlayChatBubbles() {
@@ -483,17 +577,26 @@ class BalootEngine {
 
   _qaidForcedScore(is_sun, loserTricks, doubleLevel = 1) {
     if (is_sun) {
-      if (loserTricks === 0) {
-        return { base: 44, is_kaput: true, is_qaid_normal: false };
-      }
-      return { base: 30, is_kaput: false, is_qaid_normal: true };
+      const is_kaput = loserTricks === 0;
+      return {
+        base: is_kaput ? SCORING.KAPUT_BASE.SUN : SCORING.FALL_BASE.SUN,
+        is_kaput,
+        is_qaid_normal: loserTricks > 0,
+      };
     }
-    let base = loserTricks === 0 ? 25 : 16;
+    if (doubleLevel === 5) {
+      return { base: SCORING.GAHWA_POINTS, is_kaput: loserTricks === 0, is_qaid_normal: false };
+    }
+    const mult = doubleLevel >= 1 && doubleLevel <= 4 ? doubleLevel : 1;
     const is_kaput = loserTricks === 0;
-    if (doubleLevel >= 2 && doubleLevel <= 4) {
-      base *= doubleLevel;
-    }
-    return { base, is_kaput, is_qaid_normal: !is_kaput };
+    const base = is_kaput
+      ? SCORING.KAPUT_BASE.HAKAM * mult
+      : SCORING.DOUBLE_POINTS_BASE * mult;
+    return {
+      base,
+      is_kaput,
+      is_qaid_normal: loserTricks > 0,
+    };
   }
 
   /** من يفوز بالأكلة حتى الآن (للأكلة الجارية) */
@@ -1136,7 +1239,7 @@ class BalootEngine {
     return [winner_idx, trick_points];
   }
 
-  play_card(player_idx, card_index) {
+  play_card(player_idx, card_index, options = {}) {
     if (this.phase !== GamePhase.PLAYING || this.turn !== player_idx) return false;
     if (this.sawa_declaration) return false;
     if (card_index < 0 || card_index >= this.hands[player_idx].length) return false;
@@ -1146,6 +1249,10 @@ class BalootEngine {
     const mistakeType = this._classifyMistake(player_idx, card_index);
     const is_mistake = !legal_moves.includes(card_index) || mistakeType !== null;
     const card = this.hands[player_idx][card_index];
+    let ekkahMeta = null;
+    if (options.is_ekkah_declared === true) {
+      ekkahMeta = this._registerEkkahDeclaration(player_idx, card);
+    }
 
     if (is_mistake) {
       const legal_cards = legal_moves.map((i) => this.hands[player_idx][i]);
@@ -1187,7 +1294,12 @@ class BalootEngine {
     } else {
       this.turn = -1;
     }
+    this._last_ekkah_play_meta = ekkahMeta;
     return true;
+  }
+
+  getLastEkkahPlayMeta() {
+    return this._last_ekkah_play_meta || null;
   }
 
   resolve_trick() {
@@ -1219,6 +1331,13 @@ class BalootEngine {
       1: raw_tricks[1] + ground_pts[1] + raw_proj[1],
       2: raw_tricks[2] + ground_pts[2] + raw_proj[2],
     };
+    // جبر الستة — لعب عادي فقط (بدون تدبيل): تعادل الأبناط الخام → خصم 5 من المشتري.
+    if (this.double_level <= 1) {
+      applyJabirOnRawTie(abnat, buyer);
+    }
+    const doubler_team = this.last_doubling_seat != null
+      ? seatToTeam(this.last_doubling_seat)
+      : null;
     const base_final = {
       1: this._abnatToBoardScore(abnat[1], is_sun),
       2: this._abnatToBoardScore(abnat[2], is_sun),
@@ -1235,6 +1354,35 @@ class BalootEngine {
 
     const winnerProjScore = (winnerTeam) => this._projectsBoardScore(raw_proj[winnerTeam], is_sun);
 
+    const settlePlayingRound = () => {
+      if (this.tricks_won[1] === 8) {
+        is_kaput = true;
+        kaput_team = 1;
+      } else if (this.tricks_won[2] === 8) {
+        is_kaput = true;
+        kaput_team = 2;
+      }
+      if (is_kaput) {
+        final_round_score[kaput_team] = kaputBaseScore(is_sun) + winnerProjScore(kaput_team);
+        final_round_score[3 - kaput_team] = 0;
+        return;
+      }
+      const settled = settleNormalRound({
+        isSun: is_sun,
+        baseFinal: base_final,
+        buyerTeam: buyer,
+        rawTricks: raw_tricks,
+        groundPts: ground_pts,
+        rawProj: raw_proj,
+        isDoubled: is_doubled,
+        doubleLevel: this.double_level,
+        doublerTeam: doubler_team,
+      });
+      final_round_score[1] = settled.scores[1];
+      final_round_score[2] = settled.scores[2];
+      is_fall = settled.is_fall;
+    };
+
     if (forced_win_team !== null) {
       const winner = forced_win_team;
       const sawaEnd = end_reason === 'sawa' || end_reason === 'qaid_sawa';
@@ -1242,8 +1390,7 @@ class BalootEngine {
       if (sawaEnd) {
         is_sawa = true;
         sawa_team = winner;
-        final_round_score[winner] = kaputBaseScore(is_sun) + winnerProjScore(winner);
-        final_round_score[3 - winner] = 0;
+        settlePlayingRound();
       } else if (end_reason === 'qaid') {
         const loserTricks = meta.qaid_loser_tricks ?? this.tricks_won[3 - winner];
         const qaidScore = this._qaidForcedScore(is_sun, loserTricks, this.double_level);
@@ -1263,28 +1410,7 @@ class BalootEngine {
         final_round_score[3 - winner] = 0;
       }
     } else {
-      if (this.tricks_won[1] === 8) {
-        is_kaput = true;
-        kaput_team = 1;
-      } else if (this.tricks_won[2] === 8) {
-        is_kaput = true;
-        kaput_team = 2;
-      }
-      if (is_kaput) {
-        final_round_score[kaput_team] = kaputBaseScore(is_sun) + winnerProjScore(kaput_team);
-        final_round_score[3 - kaput_team] = 0;
-      } else {
-        const settled = settleNormalRound({
-          baseFinal: base_final,
-          buyerTeam: buyer,
-          isDoubled: is_doubled,
-          doubleLevel: this.double_level,
-          sunOver100Special: this.sun_over100_special,
-        });
-        final_round_score[1] = settled.scores[1];
-        final_round_score[2] = settled.scores[2];
-        is_fall = settled.is_fall;
-      }
+      settlePlayingRound();
     }
     this.total_scores[1] += final_round_score[1];
     this.total_scores[2] += final_round_score[2];
@@ -1294,6 +1420,7 @@ class BalootEngine {
       if (rw === null) {
         if (final_round_score[1] > final_round_score[2]) rw = 1;
         else if (final_round_score[2] > final_round_score[1]) rw = 2;
+        else if (doubler_team != null) rw = 3 - doubler_team;
         else rw = base_final[buyer] > base_final[defender] ? buyer : defender;
       }
       this.total_scores[1] -= final_round_score[1];
@@ -1305,10 +1432,10 @@ class BalootEngine {
     }
     let match_winner = null;
     if (is_qahwa) {
-      match_winner = final_round_score[1] === 152 ? 1 : 2;
-    } else if (this.total_scores[1] >= 152) {
+      match_winner = final_round_score[1] === SCORING.GAHWA_POINTS ? 1 : 2;
+    } else if (this.total_scores[1] >= SCORING.MATCH_WIN) {
       match_winner = 1;
-    } else if (this.total_scores[2] >= 152) {
+    } else if (this.total_scores[2] >= SCORING.MATCH_WIN) {
       match_winner = 2;
     }
     this.summary_data = {
@@ -1346,6 +1473,18 @@ class BalootEngine {
   validate_qaid(reason, selected_cards, objector_team) {
     const other_team = objector_team === 1 ? 2 : 1;
     reason = normalizeQaidReason(reason);
+
+    if (reason === 'إكة خاطئة') {
+      const violation = this._findWrongEkkahViolation(objector_team);
+      if (!violation) {
+        return { valid: false, win_team: other_team, mistake_team: objector_team };
+      }
+      return {
+        valid: true,
+        win_team: objector_team,
+        mistake_team: violation.team,
+      };
+    }
 
     if (reason === 'ربع في المقفل') {
       if (!this.is_muqfal_lead_restricted()) {
@@ -1667,5 +1806,9 @@ module.exports = {
   abnatToBoardScore,
   projectsBoardScore,
   kaputBaseScore,
+  fallBaseScore,
+  seatToTeam,
+  applyJabirOnRawTie,
+  multipliedTeamBoard,
   settleNormalRound,
 };

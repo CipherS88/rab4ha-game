@@ -38,6 +38,9 @@ class AppConfig {
 
   static bool get isDev => flavor == AppFlavor.dev;
 
+  /// تعطيل مؤقت لزر/صفحة البطولات — غيّره إلى true عند التفعيل.
+  static const tournamentsEnabled = false;
+
   static const authTokenKey = 'baloot_auth_token';
   static const authUserKey = 'baloot_user';
   static const playerNameKey = 'baloot_player_name';

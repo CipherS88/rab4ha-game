@@ -476,9 +476,31 @@ function renderTournamentDetail(data) {
   }
 }
 
+async function fetchJoinCaptcha() {
+  const res = await apiFetch('/api/tournaments/captcha');
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+async function promptJoinCaptcha() {
+  const cap = await fetchJoinCaptcha();
+  const answer = window.prompt(
+    `${cap.question}\n\nأدخل الإجابة للتحقق (مكافحة البوتات):`,
+    '',
+  );
+  if (answer == null || String(answer).trim() === '') return null;
+  return { captcha_token: cap.token, captcha_answer: String(answer).trim() };
+}
+
 async function joinTournament(id, stayOnDetail = false) {
   try {
-    const res = await apiFetch(`/api/tournaments/${id}/join`, { method: 'POST' });
+    const captcha = await promptJoinCaptcha();
+    if (!captcha) return;
+    const res = await apiFetch(`/api/tournaments/${id}/join`, {
+      method: 'POST',
+      body: JSON.stringify(captcha),
+    });
     const data = await res.json();
     if (data.error) alert(data.error);
     else {

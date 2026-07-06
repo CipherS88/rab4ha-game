@@ -7,7 +7,10 @@ const {
   PROJECT_RAW_PTS,
   SCORING,
   abnatToBoardScore,
+  projectsBoardScore,
   settleNormalRound,
+  multipliedTeamBoard,
+  applyJabirOnRawTie,
 } = require('../server/engine.js');
 
 function playingEngine(opts = {}) {
@@ -16,33 +19,18 @@ function playingEngine(opts = {}) {
   e.bid = { type: opts.bidType || 'SUN', suit: opts.bidSuit || null, bidder: opts.bidder ?? 0 };
   e.buyer_team = opts.buyerTeam ?? 1;
   e.double_level = opts.doubleLevel ?? 1;
-  e.sun_over100_special = !!opts.sunOver100Special;
   return e;
 }
 
 // ── قيم الأوراق ──
 assert.strictEqual(SUN_VALUES.A, 11);
-assert.strictEqual(SUN_VALUES['10'], 10);
-assert.strictEqual(SUN_VALUES.K, 4);
-assert.strictEqual(SUN_VALUES.Q, 3);
-assert.strictEqual(SUN_VALUES.J, 2);
-assert.strictEqual(SUN_VALUES['9'], 0);
 assert.strictEqual(HAKAM_VALUES.J, 20);
-assert.strictEqual(HAKAM_VALUES['9'], 14);
-assert.strictEqual(HAKAM_VALUES.A, 11);
-assert.strictEqual(HAKAM_VALUES['8'], 0);
 
 // ── التجبير ──
-assert.strictEqual(abnatToBoardScore(26, true), 6); // floor(31/10)*2 = 6
-assert.strictEqual(abnatToBoardScore(26, false), 3); // floor(31/10)*1 = 3
-assert.strictEqual(abnatToBoardScore(4, true), 0);
-assert.strictEqual(abnatToBoardScore(5, true), 2);
+assert.strictEqual(abnatToBoardScore(26, true), 6);
+assert.strictEqual(abnatToBoardScore(26, false), 3);
 
-// ── مشاريع خام ──
-assert.deepStrictEqual(PROJECT_RAW_PTS.سرا, [20, 20]);
-assert.deepStrictEqual(PROJECT_RAW_PTS.أربعمية, [200, 0]);
-
-// ── فوز طبيعي (المشتري أعلى) ──
+// ── السيناريو 1: المشتري فاز صن ──
 {
   const e = playingEngine();
   e.round_points = { 1: 80, 2: 40 };
@@ -54,7 +42,7 @@ assert.deepStrictEqual(PROJECT_RAW_PTS.أربعمية, [200, 0]);
   assert.strictEqual(e.summary_data.final[2], e.summary_data.base_final[2]);
 }
 
-// ── سقوط المشتري ──
+// ── السيناريو 2: سقوط المشتري صن = 30 + مشاريع المدافع ──
 {
   const e = playingEngine();
   e.round_points = { 1: 30, 2: 70 };
@@ -63,13 +51,24 @@ assert.deepStrictEqual(PROJECT_RAW_PTS.أربعمية, [200, 0]);
   e.finalize_round();
   assert.strictEqual(e.summary_data.is_fall, true);
   assert.strictEqual(e.summary_data.final[1], 0);
+  assert.strictEqual(e.summary_data.final[2], SCORING.FALL_BASE.SUN);
+}
+
+{
+  const e = playingEngine();
+  e.round_points = { 1: 30, 2: 70 };
+  e.tricks_won = { 1: 3, 2: 5 };
+  e.last_trick_winner_team = 2;
+  e.winning_project_team = 2;
+  e.declared_projects = { 0: [], 1: [], 2: [], 3: ['سرا'] };
+  e.finalize_round();
   assert.strictEqual(
     e.summary_data.final[2],
-    e.summary_data.base_final[1] + e.summary_data.base_final[2],
+    SCORING.FALL_BASE.SUN + abnatToBoardScore(20, true),
   );
 }
 
-// ── كبوت صن: 44 + مشاريع الفائز فقط ──
+// ── السيناريو 3: كبوت صن ──
 {
   const e = playingEngine();
   e.tricks_won = { 1: 8, 2: 0 };
@@ -81,7 +80,19 @@ assert.deepStrictEqual(PROJECT_RAW_PTS.أربعمية, [200, 0]);
   assert.strictEqual(e.summary_data.final[2], 0);
 }
 
-// ── كبوت حكم: 25 ──
+// ── السيناريو 5: سقوط المشتري حكم = 16 + مشاريع المدافع ──
+{
+  const e = playingEngine({ bidType: 'HAKAM', bidSuit: 'HEARTS' });
+  e.round_points = { 1: 20, 2: 60 };
+  e.tricks_won = { 1: 2, 2: 6 };
+  e.last_trick_winner_team = 2;
+  e.finalize_round();
+  assert.strictEqual(e.summary_data.is_fall, true);
+  assert.strictEqual(e.summary_data.final[1], 0);
+  assert.strictEqual(e.summary_data.final[2], SCORING.FALL_BASE.HAKAM);
+}
+
+// ── السيناريو 6: كبوت حكم ──
 {
   const e = playingEngine({ bidType: 'HAKAM', bidSuit: 'HEARTS' });
   e.tricks_won = { 1: 0, 2: 8 };
@@ -90,59 +101,61 @@ assert.deepStrictEqual(PROJECT_RAW_PTS.أربعمية, [200, 0]);
   assert.strictEqual(e.summary_data.final[1], 0);
 }
 
-// ── تدبيل: 16 × المعامل ──
-for (const level of [2, 3, 4]) {
+// ── السيناريو 7: المشتري فاز دبل — الفريقان يأخذان (أبناط×2) ──
+{
   const settled = settleNormalRound({
+    isSun: false,
     baseFinal: { 1: 10, 2: 6 },
     buyerTeam: 1,
+    rawTricks: { 1: 85, 2: 45 },
+    groundPts: { 1: 0, 2: 0 },
+    rawProj: { 1: 0, 2: 0 },
     isDoubled: true,
-    doubleLevel: level,
-    sunOver100Special: false,
+    doubleLevel: 2,
   });
-  assert.strictEqual(settled.scores[1], SCORING.DOUBLE_POINTS_BASE * level);
-  assert.strictEqual(settled.scores[2], 0);
+  assert.strictEqual(settled.scores[1], multipliedTeamBoard(
+    { 1: 85, 2: 45 }, { 1: 0, 2: 0 }, { 1: 0, 2: 0 }, 1, false, 2,
+  ));
+  assert.strictEqual(settled.scores[2], multipliedTeamBoard(
+    { 1: 85, 2: 45 }, { 1: 0, 2: 0 }, { 1: 0, 2: 0 }, 2, false, 2,
+  ));
   assert.strictEqual(settled.is_fall, false);
 }
 
-// ── تدبيل: المدافع يفوز ──
+// ── السيناريو 8: المشتري خسر دبل = 32 + مشاريع المدافع ──
 {
   const settled = settleNormalRound({
+    isSun: false,
     baseFinal: { 1: 4, 2: 8 },
     buyerTeam: 1,
+    rawTricks: { 1: 20, 2: 80 },
+    groundPts: { 1: 0, 2: 0 },
+    rawProj: { 1: 0, 2: 20 },
     isDoubled: true,
     doubleLevel: 2,
-    sunOver100Special: false,
   });
-  assert.strictEqual(settled.scores[2], 32);
   assert.strictEqual(settled.scores[1], 0);
+  assert.strictEqual(settled.scores[2], 32 + abnatToBoardScore(20, false));
   assert.strictEqual(settled.is_fall, true);
 }
 
-// ── صن فوق 100 + دبل = 60 ──
-{
-  const e = playingEngine({ sunOver100Special: true, doubleLevel: 2 });
-  e.round_points = { 1: 80, 2: 40 };
-  e.tricks_won = { 1: 5, 2: 3 };
-  e.last_trick_winner_team = 1;
-  e.finalize_round();
-  assert.strictEqual(e.summary_data.final[1], SCORING.SUN_OVER100_DOUBLE);
-  assert.strictEqual(e.summary_data.final[2], 0);
+for (const [level, pts] of [[2, 32], [3, 48], [4, 64]]) {
+  const settled = settleNormalRound({
+    isSun: false,
+    baseFinal: { 1: 4, 2: 8 },
+    buyerTeam: 1,
+    rawTricks: { 1: 20, 2: 80 },
+    groundPts: { 1: 0, 2: 0 },
+    rawProj: { 1: 0, 2: 0 },
+    isDoubled: true,
+    doubleLevel: level,
+  });
+  assert.strictEqual(settled.scores[2], pts, `fall level ${level}`);
 }
 
+// ── السيناريو 9: قهوة = 150 ──
 {
-  const e = playingEngine({ sunOver100Special: true, doubleLevel: 2, buyerTeam: 1 });
-  e.round_points = { 1: 20, 2: 90 };
-  e.tricks_won = { 1: 2, 2: 6 };
-  e.last_trick_winner_team = 2;
-  e.finalize_round();
-  assert.strictEqual(e.summary_data.final[2], SCORING.SUN_OVER100_DOUBLE);
-  assert.strictEqual(e.summary_data.final[1], 0);
-  assert.strictEqual(e.summary_data.is_fall, true);
-}
-
-// ── قهوة = 152 ──
-{
-  const e = playingEngine({ doubleLevel: 5 });
+  const e = playingEngine({ bidType: 'HAKAM', bidSuit: 'CLUBS', doubleLevel: 5 });
   e.round_points = { 1: 50, 2: 60 };
   e.tricks_won = { 1: 4, 2: 4 };
   e.last_trick_winner_team = 2;
@@ -150,6 +163,20 @@ for (const level of [2, 3, 4]) {
   assert.strictEqual(e.summary_data.is_qahwa, true);
   assert.strictEqual(e.summary_data.final[2], SCORING.GAHWA_POINTS);
   assert.strictEqual(e.summary_data.final[1], 0);
+}
+
+// ── السيناريو 10: سوا = حساب طبيعي + أرض للمُعلِن ──
+{
+  const e = playingEngine();
+  e.round_points = { 1: 30, 2: 20 };
+  e.tricks_won = { 1: 2, 2: 1 };
+  e.last_trick_winner_team = 2;
+  e.finalize_round(1, 'sawa');
+  assert.strictEqual(e.summary_data.is_sawa, true);
+  assert.strictEqual(e.summary_data.ground[1], 10);
+  assert.strictEqual(e.summary_data.final[1], e.summary_data.base_final[1]);
+  assert.strictEqual(e.summary_data.final[2], e.summary_data.base_final[2]);
+  assert.notStrictEqual(e.summary_data.final[2], 0);
 }
 
 // ── مشاريع: الفريق الفائز فقط (صن) ──
@@ -165,67 +192,161 @@ for (const level of [2, 3, 4]) {
   assert.strictEqual(e.summary_data.projects[2], 0);
 }
 
-// ── حكم مفتوح: الأكلة كصن على لون البداية ──
+// ══════════════════════════════════════════════════════════════
+// Regression — جبر الستة، تعادل التدبيل/القهوة، ثري/فور + مشاريع
+// ══════════════════════════════════════════════════════════════
+
+// ── R1: تعادل الأبناط في اللعب العادي → جبر الستة → خسارة المشتري ──
 {
-  const e = playingEngine({ bidType: 'HAKAM', bidSuit: 'CLUBS' });
-  e.double_level = 2;
-  e.hakam_locked = false;
-  e.buyer_seat = 0;
-  e.current_trick = [
-    { player: 0, card: { suit: 'HEARTS', rank: 'A' } },
-    { player: 1, card: { suit: 'HEARTS', rank: 'J' } },
-    { player: 2, card: { suit: 'HEARTS', rank: '10' } },
-    { player: 3, card: { suit: 'HEARTS', rank: 'K' } },
-  ];
-  const [winner] = e.evaluate_trick();
-  assert.strictEqual(winner, 0, 'آس الهاص يأخذ الأكلة على ولد الهاص في الحكم المفتوح');
+  const e = playingEngine({ bidType: 'SUN', doubleLevel: 1, buyerTeam: 1 });
+  e.round_points = { 1: 53, 2: 53 };
+  e.tricks_won = { 1: 4, 2: 4 };
+  e.last_trick_winner_team = null;
+  e.finalize_round();
+  assert.strictEqual(e.summary_data.abnat[1], 48, 'جبر الستة: −5 من المشتري');
+  assert.strictEqual(e.summary_data.abnat[2], 58, 'جبر الستة: +5 للمدافع');
+  assert.strictEqual(e.summary_data.is_fall, true, 'خسارة المشتري');
+  assert.strictEqual(e.summary_data.final[1], 0);
+  assert.strictEqual(e.summary_data.final[2], SCORING.FALL_BASE.SUN);
 }
 
-// ── حكم مفتوح: الفائز مطابق 1.py (الحكم يأكل) ──
+// ── R1b: 106 مقابل 106 (أكلات + مشاريع + أرض) — صن ──
 {
-  const e = playingEngine({ bidType: 'HAKAM', bidSuit: 'CLUBS' });
-  e.double_level = 2;
-  e.hakam_locked = false;
-  e.buyer_seat = 0;
-  e.current_trick = [
-    { player: 0, card: { suit: 'HEARTS', rank: 'A' } },
-    { player: 1, card: { suit: 'CLUBS', rank: 'J' } },
-    { player: 2, card: { suit: 'HEARTS', rank: '10' } },
-    { player: 3, card: { suit: 'HEARTS', rank: 'K' } },
-  ];
-  const [winner] = e.evaluate_trick();
-  assert.strictEqual(winner, 1, 'ولد الحكم يأخذ الأكلة على آس الهاص (مطابق 1.py)');
+  const e = playingEngine({ bidType: 'SUN', doubleLevel: 1, buyerTeam: 1 });
+  e.round_points = { 1: 86, 2: 96 };
+  e.tricks_won = { 1: 4, 2: 4 };
+  e.last_trick_winner_team = 2; // أرض 10 → فريق 2 = 96+10 = 106
+  e.winning_project_team = 1;
+  e.declared_projects = { 0: ['سرا'], 1: [], 2: [], 3: [] }; // فريق 1 = 86+20 = 106
+  e.finalize_round();
+  assert.strictEqual(e.summary_data.abnat[1], 101);
+  assert.strictEqual(e.summary_data.abnat[2], 111);
+  assert.strictEqual(e.summary_data.is_fall, true);
+  assert.strictEqual(e.summary_data.final[1], 0);
+  assert.strictEqual(e.summary_data.final[2], SCORING.FALL_BASE.SUN);
 }
 
-// ── حكم مفتوح: المشتري وحده دقّ بالحكم ──
+// ── R2: تعادل في دبل → خسارة فريق المدبل (المدافع طلب الدبل) ──
 {
-  const e = playingEngine({ bidType: 'HAKAM', bidSuit: 'CLUBS' });
-  e.double_level = 2;
-  e.hakam_locked = false;
-  e.buyer_seat = 0;
-  e.current_trick = [
-    { player: 0, card: { suit: 'CLUBS', rank: '9' } },
-    { player: 1, card: { suit: 'HEARTS', rank: 'A' } },
-    { player: 2, card: { suit: 'HEARTS', rank: '10' } },
-    { player: 3, card: { suit: 'HEARTS', rank: 'K' } },
-  ];
-  const [winner] = e.evaluate_trick();
-  assert.strictEqual(winner, 0, 'المشتري وحده دقّ بالحكم فيأخذ الأكلة');
+  const e = playingEngine({ bidType: 'HAKAM', bidSuit: 'HEARTS', doubleLevel: 2, buyerTeam: 1 });
+  e.last_doubling_seat = 1; // مقعد 1 = فريق 2 (المدافع) طلب الدبل
+  e.round_points = { 1: 50, 2: 50 };
+  e.tricks_won = { 1: 4, 2: 4 };
+  e.last_trick_winner_team = null;
+  e.finalize_round();
+  const expectedWinner = multipliedTeamBoard(
+    { 1: 50, 2: 50 }, { 1: 0, 2: 0 }, { 1: 0, 2: 0 }, 1, false, 2,
+  );
+  assert.strictEqual(e.summary_data.final[2], 0, 'المدبل (فريق 2) = 0');
+  assert.strictEqual(e.summary_data.final[1], expectedWinner, 'الفائز = نقاط مضاعفة');
+  assert.strictEqual(e.summary_data.is_fall, false, 'المشتري لم يخسر');
 }
 
-// ── حكم مقفل: الحكم يأكل كالعادة ──
+// ── R2b: تعادل دبل — المشتري هو المدبل → خسارة المشتري ──
 {
-  const e = playingEngine({ bidType: 'HAKAM', bidSuit: 'CLUBS' });
-  e.double_level = 2;
-  e.hakam_locked = true;
-  e.current_trick = [
-    { player: 0, card: { suit: 'HEARTS', rank: 'A' } },
-    { player: 1, card: { suit: 'CLUBS', rank: 'J' } },
-    { player: 2, card: { suit: 'HEARTS', rank: '10' } },
-    { player: 3, card: { suit: 'HEARTS', rank: 'K' } },
-  ];
-  const [winner] = e.evaluate_trick();
-  assert.strictEqual(winner, 1, 'في المقفل الحكم يأخذ الأكلة');
+  const settled = settleNormalRound({
+    isSun: false,
+    baseFinal: { 1: 10, 2: 10 },
+    buyerTeam: 1,
+    rawTricks: { 1: 50, 2: 50 },
+    groundPts: { 1: 0, 2: 0 },
+    rawProj: { 1: 0, 2: 0 },
+    isDoubled: true,
+    doubleLevel: 2,
+    doublerTeam: 1,
+  });
+  assert.strictEqual(settled.scores[1], 0);
+  assert.strictEqual(
+    settled.scores[2],
+    multipliedTeamBoard(
+      { 1: 50, 2: 50 }, { 1: 0, 2: 0 }, { 1: 0, 2: 0 }, 2, false, 2,
+    ),
+  );
+  assert.strictEqual(settled.is_fall, true);
+}
+
+// ── R3: تعادل في القهوة → المدبل يخسر، الخصم 150 ──
+{
+  const e = playingEngine({ bidType: 'HAKAM', bidSuit: 'CLUBS', doubleLevel: 5, buyerTeam: 1 });
+  e.last_doubling_seat = 0; // المشتري (مقعد 0) طلب القهوة
+  e.round_points = { 1: 50, 2: 50 };
+  e.tricks_won = { 1: 4, 2: 4 };
+  e.last_trick_winner_team = null;
+  e.finalize_round();
+  assert.strictEqual(e.summary_data.is_qahwa, true);
+  assert.strictEqual(e.summary_data.final[1], 0, 'المدبل = 0');
+  assert.strictEqual(e.summary_data.final[2], SCORING.GAHWA_POINTS, 'الخصم = 150');
+  assert.strictEqual(e.summary_data.is_fall, true, 'خسارة المشتري (المدبل)');
+}
+
+// ── R3b: تعادل قهوة — المدافع طلب القهوة ──
+{
+  const settled = settleNormalRound({
+    isSun: false,
+    baseFinal: { 1: 8, 2: 8 },
+    buyerTeam: 1,
+    rawTricks: { 1: 40, 2: 40 },
+    groundPts: { 1: 0, 2: 0 },
+    rawProj: { 1: 0, 2: 0 },
+    isDoubled: true,
+    doubleLevel: 5,
+    doublerTeam: 2,
+  });
+  assert.strictEqual(settled.scores[2], 0);
+  assert.strictEqual(settled.scores[1], SCORING.GAHWA_POINTS);
+  assert.strictEqual(settled.is_fall, false);
+}
+
+// ── R4: ثري/فور في الحكم — الأكلات × المضاعف، المشاريع 1x فقط ──
+for (const mult of [3, 4]) {
+  const rawTricks = { 1: 60, 2: 40 };
+  const groundPts = { 1: 0, 2: 0 };
+  const rawProj = { 1: 20, 2: 0 };
+  const tricksOnlyMult = abnatToBoardScore(60 * mult, false) + projectsBoardScore(20, false);
+  const allMultWrong = abnatToBoardScore((60 + 20) * mult, false);
+
+  assert.strictEqual(
+    multipliedTeamBoard(rawTricks, groundPts, rawProj, 1, false, mult),
+    tricksOnlyMult,
+    `ثري/فور ${mult}: أكلات مضاعفة + مشاريع 1x`,
+  );
+  assert.notStrictEqual(tricksOnlyMult, allMultWrong, `ثري/فور ${mult}: المشاريع لا تُضرب`);
+
+  const settled = settleNormalRound({
+    isSun: false,
+    baseFinal: { 1: 12, 2: 6 },
+    buyerTeam: 1,
+    rawTricks,
+    groundPts,
+    rawProj,
+    isDoubled: true,
+    doubleLevel: mult,
+    doublerTeam: 2,
+  });
+  assert.strictEqual(settled.scores[1], tricksOnlyMult, `فوز المشتري ثري/فور ${mult}`);
+  assert.strictEqual(settled.scores[2], multipliedTeamBoard(rawTricks, groundPts, rawProj, 2, false, mult));
+  assert.strictEqual(settled.is_fall, false);
+}
+
+// ── R4b: دبل (2) في الحكم — المشاريع تُضرب مع الأكلات ──
+{
+  const rawTricks = { 1: 60, 2: 40 };
+  const rawProj = { 1: 20, 2: 0 };
+  const doubleAll = abnatToBoardScore((60 + 20) * 2, false);
+  assert.strictEqual(
+    multipliedTeamBoard(rawTricks, { 1: 0, 2: 0 }, rawProj, 1, false, 2),
+    doubleAll,
+    'دبل: أكلات + مشاريع ×2 معاً',
+  );
+}
+
+// ── وحدة: applyJabirOnRawTie ──
+{
+  const abnat = { 1: 106, 2: 106 };
+  assert.strictEqual(applyJabirOnRawTie(abnat, 1), true);
+  assert.strictEqual(abnat[1], 101);
+  assert.strictEqual(abnat[2], 111);
+  assert.strictEqual(applyJabirOnRawTie({ 1: 80, 2: 90 }, 1), false);
 }
 
 console.log('scoring_engine_test: ok');

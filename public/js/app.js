@@ -537,15 +537,19 @@ async function startMatchmaking(solo = false, mode = 'friendly') {
   if (solo) {
     if (title) title.textContent = 'وضع التجربة الفردية';
     if (sub) sub.textContent = 'تتحكم بكل المقاعد';
+    $('#btn-fill-bots')?.classList.add('hidden');
   } else if (mode === 'ranked') {
     if (title) title.textContent = 'جاري البحث عن خصوم...';
     if (sub) sub.textContent = 'مباراة مصنّفة — بانتظار 4 لاعبين';
+    $('#btn-fill-bots')?.classList.add('hidden');
   } else if (mode === 'match52') {
     if (title) title.textContent = 'مباراة 52';
     if (sub) sub.textContent = 'ودّية — يبدأ الفريقان من 52 نقطة';
+    $('#btn-fill-bots')?.classList.remove('hidden');
   } else {
     if (title) title.textContent = 'غرفة ودّية';
     if (sub) sub.textContent = 'لاعب واحد + بوتات — اضغط «ملء بالروبوت»';
+    $('#btn-fill-bots')?.classList.remove('hidden');
   }
 
   updateMatchmakingCount([]);
@@ -1363,19 +1367,8 @@ function renderPublicElements() {
         );
       }
     } else if (!isBottomHandSeat(globalSeat) && gameState.sawa_declaration) {
-      if (nodes.handEl) {
-        if (isSawaDeclarerSeat(globalSeat) || isSawaOpponentSeat(globalSeat)) {
-          nodes.handEl.innerHTML = '';
-        } else {
-          const back = seatDeckBackUrl(globalSeat);
-          buildFanHand(
-            nodes.handEl,
-            gameState.hand_counts?.[globalSeat] || 0,
-            false,
-            back,
-          );
-        }
-      }
+      // أثناء السوا تُعرض كروت الجميع (خصوم + شريك) عبر طبقة الفرش — نُخفي المراوح المقلوبة
+      if (nodes.handEl) nodes.handEl.innerHTML = '';
     }
     setSeatVisualClass(visualPos, 'sawa-declarer-seat', isSawaDeclarerSeat(globalSeat));
   }
@@ -1982,7 +1975,10 @@ function renderSawaSpreads() {
   }
 
   for (let g = 0; g < 4; g++) {
-    if (!isSawaOpponentSeat(g)) continue;
+    // المُعلِن تُعرض كروته سكاتر في المنتصف
+    if (isSawaDeclarerSeat(g)) continue;
+    // مقعدي السفلي: إن كنت شريك المُعلِن فيدي الحقيقية ظاهرة فلا نكرر الفرش
+    if (isBottomHandSeat(g) && !isSawaOpponentSeat(g)) continue;
     const oppEntry = gameState.sawa_hands.find((h) => h.seat === g);
     if (!oppEntry?.cards?.length) continue;
 

@@ -42,6 +42,7 @@ db.exec(`
 
 try { db.exec(`ALTER TABLE players ADD COLUMN reduced_next_win INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
 try { db.exec(`ALTER TABLE players ADD COLUMN gems INTEGER NOT NULL DEFAULT 1000`); } catch (_) {}
+try { db.exec(`ALTER TABLE players ADD COLUMN recreational_tournament_points INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
 try { db.exec(`UPDATE players SET gems = 1000 WHERE gems IS NULL`); } catch (_) {}
 
 const getPlayerStmt = db.prepare('SELECT * FROM players WHERE device_id = ?');
@@ -59,6 +60,7 @@ const updatePlayerStmt = db.prepare(`
     wins = @wins,
     losses = @losses,
     championship_stars = @championship_stars,
+    recreational_tournament_points = @recreational_tournament_points,
     reduced_next_win = @reduced_next_win,
     gems = @gems,
     updated_at = datetime('now')
@@ -82,6 +84,7 @@ function rowToProfile(row) {
     wins: row.wins,
     losses: row.losses,
     championship_stars: row.championship_stars,
+    recreational_tournament_points: row.recreational_tournament_points ?? 0,
     reduced_next_win: row.reduced_next_win || 0,
     stat_fair: row.stat_fair ?? 0,
     stat_buy: row.stat_buy ?? 0,
@@ -117,6 +120,7 @@ function savePlayer(profile) {
     wins: profile.wins,
     losses: profile.losses,
     championship_stars: profile.championship_stars ?? 0,
+    recreational_tournament_points: profile.recreational_tournament_points ?? 0,
     reduced_next_win: profile.reduced_next_win ? 1 : 0,
     gems: profile.gems ?? 1000,
   });

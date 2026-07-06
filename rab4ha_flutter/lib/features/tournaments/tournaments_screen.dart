@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/rab4ha_theme.dart';
-import '../../shared/widgets/buttons.dart';
 import 'tournament_hero_card.dart';
+import 'tournament_captcha_dialog.dart';
 
 class TournamentsScreen extends ConsumerStatefulWidget {
   const TournamentsScreen({super.key});
@@ -20,10 +20,6 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
   var _type = 'casual';
   List<dynamic> _items = [];
   Map<String, dynamic>? _meta;
-  final _title = TextEditingController(text: 'بطولة بلوت');
-  var _size = 8;
-  var _format = 'bo1';
-  var _showCreate = false;
 
   @override
   void initState() {
@@ -48,33 +44,37 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
     });
   }
 
-  Future<void> _create() async {
-    final api = ref.read(apiClientProvider);
-    final res = await api.post('/api/tournaments', body: {
-      'type': _type,
-      'title': _title.text.trim(),
-      'size': _size,
-      'match_format': _format,
-    });
-    final data = await api.parseJson(res);
-    setState(() => _showCreate = false);
-    await _load();
-    final created = data['tournament'] as Map?;
-    if (created != null && mounted) {
-      context.push('/tournaments/${created['id']}');
-    }
-  }
-
   Future<void> _join(String id) async {
-    final api = ref.read(apiClientProvider);
-    await api.post('/api/tournaments/$id/join');
-    await _load();
+    final cap = await showTournamentCaptchaDialog(context, ref);
+    if (cap == null) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.post('/api/tournaments/$id/join', body: {
+        'captcha_token': cap.token,
+        'captcha_answer': cap.answer,
+      });
+      final data = await api.parseJson(res);
+      if (data['error'] != null) {
+        throw ApiException(data['error'].toString());
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حجز مقعدك في البطولة ✓')),
+        );
+      }
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ApiClient.mapError(e).message)),
+        );
+      }
+    }
   }
 
   @override
   void dispose() {
     _tabs.dispose();
-    _title.dispose();
     super.dispose();
   }
 
@@ -90,8 +90,9 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
         actions: [
           if (_type == 'casual')
             IconButton(
-              icon: Icon(_showCreate ? Icons.close : Icons.add, color: c.goldLight),
-              onPressed: () => setState(() => _showCreate = !_showCreate),
+              icon: Icon(Icons.add, color: c.goldLight),
+              tooltip: 'إنشاء بطولة',
+              onPressed: () => context.push('/tournaments/create'),
             ),
         ],
         bottom: TabBar(
@@ -106,47 +107,11 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Text(
-                'حصة إنشاء البطولات: ${quota['used']}/${quota['limit']}',
+                'حصة إنشاء البطولات: ${quota['used']}/${quota['limit']} — رسوم الإنشاء 500 عملة',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: c.textMuted),
               ),
             ),
-          if (_showCreate && _type == 'casual') ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: _title,
-                      decoration: const InputDecoration(labelText: 'اسم البطولة'),
-                    ),
-                    DropdownButtonFormField<int>(
-                      initialValue: _size,
-                      decoration: const InputDecoration(labelText: 'عدد اللاعبين'),
-                      items: [8, 16, 32, 64]
-                          .map((n) => DropdownMenuItem(value: n, child: Text('$n')))
-                          .toList(),
-                      onChanged: (v) => setState(() => _size = v ?? 8),
-                    ),
-                    DropdownButtonFormField<String>(
-                      initialValue: _format,
-                      decoration: const InputDecoration(labelText: 'نظام المباريات'),
-                      items: const [
-                        DropdownMenuItem(value: 'bo1', child: Text('جولة واحدة')),
-                        DropdownMenuItem(value: 'bo3', child: Text('أفضل من 3')),
-                        DropdownMenuItem(value: 'elim_bo3_final', child: Text('إقصاء + نهائي BO3')),
-                      ],
-                      onChanged: (v) => setState(() => _format = v ?? 'bo1'),
-                    ),
-                    const SizedBox(height: 8),
-                    PrimaryButton(label: 'إنشاء البطولة', onPressed: _create),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
           if (_items.isEmpty)
             Padding(
               padding: const EdgeInsets.all(24),
@@ -173,6 +138,13 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
             }),
         ],
       ),
+      floatingActionButton: _type == 'casual'
+          ? FloatingActionButton.extended(
+              onPressed: () => context.push('/tournaments/create'),
+              icon: const Icon(Icons.emoji_events_outlined),
+              label: const Text('إنشاء بطولة'),
+            )
+          : null,
     );
   }
 }

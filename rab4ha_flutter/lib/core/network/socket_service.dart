@@ -48,9 +48,10 @@ class SocketService {
     const events = [
       'room_update', 'room_abandoned', 'game_start', 'game_state',
       'solo_game_state', 'game_public', 'card_thrown', 'trick_resolved',
-      'chat', 'qaid_started', 'qaid_ended', 'sawa_declared', 'match_over',
+      'chat', 'qaid_started', 'qaid_ended', 'sawa_declared', 'ekkah_declared', 'match_over',
       'match_forfeit', 'player_left', 'new_round', 'table_gift',
       'emergency_play', 'chat:message', 'gift:received',
+      'admin_announcement', 'admin_warning',
     ];
     for (final e in events) {
       _socket!.off(e);

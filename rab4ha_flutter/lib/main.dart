@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import 'core/config/app_config.dart';
 import 'core/logging/app_logger.dart';
@@ -9,6 +8,7 @@ import 'core/network/api_client.dart';
 import 'core/network/socket_service.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/rab4ha_theme.dart';
+import 'features/admin/admin_provider.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/game/game_layout_provider.dart';
 import 'features/gifts/gift_controller.dart';
@@ -39,6 +39,7 @@ class _Rab4haAppState extends ConsumerState<Rab4haApp> {
     if (ref.read(authProvider).isLoggedIn) {
       _giftsWired = true;
       wireGiftListeners(ref);
+      wireAdminListeners(ref);
     }
   }
 
@@ -59,8 +60,10 @@ class _Rab4haAppState extends ConsumerState<Rab4haApp> {
       ],
       builder: (context, child) => Directionality(
         textDirection: TextDirection.rtl,
-        child: GiftReceiveOverlay(
-          child: HomeToastOverlay(child: child ?? const SizedBox.shrink()),
+        child: AdminNoticeOverlay(
+          child: GiftReceiveOverlay(
+            child: HomeToastOverlay(child: child ?? const SizedBox.shrink()),
+          ),
         ),
       ),
       routerConfig: router,

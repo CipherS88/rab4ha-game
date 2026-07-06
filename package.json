@@ -13,11 +13,11 @@
     "layout:bake": "node scripts/bake-game-layout-defaults.js",
     "flutter:run": "cd rab4ha_flutter && flutter run --dart-define=FLAVOR=dev --dart-define=API_BASE_URL=http://localhost:3000 -d chrome",
     "start:full": "npm run flutter:build && npm start",
-    "test:qaid": "node test/qaid_ui_test.js && node test/qaid_logic_test.js && node test/qaid_hakam_test.js",
+    "test:qaid": "node test/qaid_ui_test.js && node test/qaid_logic_test.js && node test/qaid_hakam_test.js && node test/qaid_scoring_test.js && node test/ekkah_qaid_test.js",
     "test:scoring": "node test/ground_scoring_test.js && node test/scoring_engine_test.js",
     "test:bot": "node test/bot_brain_test.js",
     "test:trick": "node test/trick_evaluation_test.js",
-    "test:game": "node test/qaid_ui_test.js && node test/ground_scoring_test.js && node test/scoring_engine_test.js && cd rab4ha_flutter && flutter test test/core_logic_test.dart",
+    "test:game": "node test/qaid_ui_test.js && node test/ground_scoring_test.js && node test/scoring_engine_test.js && cd rab4ha_flutter && flutter test test/core_logic_test.dart test/qaid_dialog_test.dart",
     "test": "npm run test:trick && npm run test:scoring && npm run test:qaid && npm run test:bot"
   },
   "dependencies": {

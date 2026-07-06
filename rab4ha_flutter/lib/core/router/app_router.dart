@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/config/app_config.dart';
+import '../../features/admin/admin_panel_screen.dart';
 import '../../features/auth/auth_provider.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/ban_screen.dart';
@@ -21,6 +23,7 @@ import '../../features/settings/settings_screen.dart';
 import '../../features/store/store_screen.dart';
 import '../../features/tournaments/tournament_detail_screen.dart';
 import '../../features/tournaments/tournaments_screen.dart';
+import '../../features/tournaments/create_tournament_screen.dart';
 import '../../shared/widgets/app_shell.dart';
 
 /// يُحدّث GoRouter عند تغيّر الجلسة دون إعادة إنشاء الموجّه (يمنع dispose أثناء login).
@@ -56,6 +59,7 @@ String? _authRedirect(Ref ref, GoRouterState state) {
   const public = {'/login', '/name', '/ban'};
   if (!auth.isLoggedIn && !public.contains(loc)) return '/login';
   if (auth.isLoggedIn && loc == '/login') return '/home';
+  if (!AppConfig.tournamentsEnabled && loc.startsWith('/tournaments')) return '/home';
   return null;
 }
 
@@ -74,6 +78,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, s) => BanScreen(reason: ref.read(authProvider).banReason ?? 'حسابك محظور'),
       ),
       GoRoute(path: '/name', builder: (_, s) => const NameScreen()),
+      GoRoute(path: '/admin', builder: (_, s) => const AdminPanelScreen()),
       GoRoute(path: '/settings', builder: (_, s) => const SettingsScreen()),
       GoRoute(path: '/ranked', builder: (_, s) => const RankedScreen()),
       GoRoute(path: '/sessions', builder: (_, s) => const SessionsScreen()),
@@ -82,6 +87,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, s) => SessionLobbyScreen(sessionId: s.pathParameters['id']!),
       ),
       GoRoute(path: '/tournaments', builder: (_, s) => const TournamentsScreen()),
+      GoRoute(path: '/tournaments/create', builder: (_, s) => const CreateTournamentScreen()),
       GoRoute(
         path: '/tournaments/:id',
         builder: (_, s) => TournamentDetailScreen(id: s.pathParameters['id']!),

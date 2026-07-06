@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/rab4ha_theme.dart';
 import '../../core/theme/rank_themes.dart';
 import '../../shared/widgets/network_asset.dart';
+import '../settings/settings_provider.dart';
 import 'card_utils.dart';
 import 'game_controller.dart';
 import 'game_seats.dart';
@@ -56,12 +57,19 @@ class TrickTableLayer extends ConsumerStatefulWidget {
 class _TrickTableLayerState extends ConsumerState<TrickTableLayer>
     with SingleTickerProviderStateMixin {
   Ticker? _ticker;
+  int _lastFrameMs = 0;
+  int _frameIntervalMs = 8;
 
   @override
   void initState() {
     super.initState();
     _ticker = createTicker((_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      // خنق معدل التحديث حسب FPS المستهدف لتقليل عبء إعادة الرسم.
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - _lastFrameMs < _frameIntervalMs) return;
+      _lastFrameMs = now;
+      setState(() {});
     });
   }
 
@@ -71,8 +79,13 @@ class _TrickTableLayerState extends ConsumerState<TrickTableLayer>
     super.dispose();
   }
 
-  void _syncTicker(Map<int, int>? throwTimes) {
+  void _syncTicker(Map<int, int>? throwTimes, bool animationsEnabled) {
     if (_ticker == null) return;
+    // في وضع الأجهزة الضعيفة لا نشغّل مؤقّت الأنميشن إطلاقاً.
+    if (!animationsEnabled) {
+      if (_ticker!.isActive) _ticker!.stop();
+      return;
+    }
     final now = DateTime.now().millisecondsSinceEpoch;
     final animating = throwTimes?.values.any((t) => now - t < trickThrowMs) ?? false;
     if (animating && !_ticker!.isActive) {
@@ -85,13 +98,16 @@ class _TrickTableLayerState extends ConsumerState<TrickTableLayer>
   @override
   Widget build(BuildContext context) {
     final game = ref.watch(gameControllerProvider);
+    final animationsEnabled =
+        ref.watch(settingsProvider.select((s) => s.animationsEnabled));
+    _frameIntervalMs = ref.watch(settingsProvider.select((s) => s.frameIntervalMs));
     if (game.trickCollect != null) return const SizedBox.shrink();
 
     final trick = (game.gs?['current_trick'] as List?) ?? [];
     if (trick.isEmpty) return const SizedBox.shrink();
 
     final throwTimes = game.trickThrowAtMs;
-    _syncTicker(throwTimes);
+    _syncTicker(throwTimes, animationsEnabled);
 
     final mySeat = game.mySeat ?? 0;
     final dims = rab4haDims(context);
@@ -105,7 +121,8 @@ class _TrickTableLayerState extends ConsumerState<TrickTableLayer>
         final size = Size(constraints.maxWidth, constraints.maxHeight);
         final center = Offset(size.width / 2, size.height / 2);
 
-        return Stack(
+        return RepaintBoundary(
+          child: Stack(
           clipBehavior: Clip.none,
           children: [
             for (var i = 0; i < trick.length; i++)
@@ -116,7 +133,7 @@ class _TrickTableLayerState extends ConsumerState<TrickTableLayer>
                 final visualPos = getVisualPos(player, mySeat);
                 final slot = trickSlotOffset(visualPos);
                 final from = throwStartOffset(visualPos, size);
-                final t = _throwProgress(throwTimes[player]);
+                final t = animationsEnabled ? _throwProgress(throwTimes[player]) : 1.0;
                 final arc = math.sin(t * math.pi) * -26;
                 final pos = Offset.lerp(from, slot, t)! + Offset(0, arc);
                 final scale = 0.88 + 0.12 * t;
@@ -152,6 +169,7 @@ class _TrickTableLayerState extends ConsumerState<TrickTableLayer>
                 );
               }),
           ],
+          ),
         );
       },
     );
@@ -214,6 +232,10 @@ class _TrickCollectFlyLayerState extends ConsumerState<TrickCollectFlyLayer>
     if (_ctrl == null || _winner == null || _cards.isEmpty) {
       return const SizedBox.shrink();
     }
+    // وضع الأجهزة الضعيفة: نتخطى أنميشن تجميع الأكلة (تُزال تلقائياً من المتحكم).
+    final animationsEnabled =
+        ref.watch(settingsProvider.select((s) => s.animationsEnabled));
+    if (!animationsEnabled) return const SizedBox.shrink();
 
     final game = ref.watch(gameControllerProvider);
     final mySeat = game.mySeat ?? 0;
@@ -224,7 +246,8 @@ class _TrickCollectFlyLayerState extends ConsumerState<TrickCollectFlyLayer>
     final globalBack = game.gs?['card_back_url']?.toString() ?? '/cards/back_dark.png';
     final seats = (game.gs?['seats'] as List?) ?? [];
 
-    return AnimatedBuilder(
+    return RepaintBoundary(
+      child: AnimatedBuilder(
       animation: _ctrl!,
       builder: (context, _) {
         return LayoutBuilder(
@@ -285,6 +308,7 @@ class _TrickCollectFlyLayerState extends ConsumerState<TrickCollectFlyLayer>
           },
         );
       },
+      ),
     );
   }
 

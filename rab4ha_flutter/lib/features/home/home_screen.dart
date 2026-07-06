@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/rank_themes.dart';
 import '../../shared/models/user_models.dart';
@@ -47,12 +48,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _startFriendly() async {
     final p = ref.read(profileProvider);
     final name = p?.name ?? 'لاعب';
-    final ok = await ref.read(matchmakingProvider.notifier).start(
-          solo: false,
-          mode: 'friendly',
-          name: name,
-        );
-    if (mounted && ok) context.go('/matchmaking');
+    try {
+      final ok = await ref.read(matchmakingProvider.notifier).start(
+            solo: false,
+            mode: 'friendly',
+            name: name,
+          );
+      if (!mounted) return;
+      if (ok) {
+        context.go('/matchmaking');
+      } else {
+        final err = ref.read(matchmakingProvider).error;
+        ref.read(homeToastProvider.notifier).show(err ?? 'تعذّر بدء المباراة الودّية');
+      }
+    } catch (e) {
+      if (mounted) {
+        ref.read(homeToastProvider.notifier).show('تعذّر بدء المباراة الودّية');
+      }
+    }
   }
 
   Future<void> _startAdminSandbox() async {
@@ -137,6 +150,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     padding: const EdgeInsets.fromLTRB(4, 2, 8, 0),
                     child: Row(
                       children: [
+                        IconButton(
+                          icon: const Icon(Icons.admin_panel_settings, color: Color(0xFFEF4444)),
+                          tooltip: 'لوحة الإدارة',
+                          onPressed: () => context.push('/admin'),
+                        ),
                         IconButton(
                           icon: const Icon(Icons.dashboard_customize_outlined, color: Colors.redAccent),
                           tooltip: 'تعديل التخطيط',
@@ -334,7 +352,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: _HomeCubeCard(
             size: math.min(slotW, slotH),
             label: 'البطولات',
-            onTap: layout.editMode ? () {} : () => context.push('/tournaments'),
+            locked: !AppConfig.tournamentsEnabled,
+            onTap: layout.editMode
+                ? () {}
+                : () {
+                    if (!AppConfig.tournamentsEnabled) {
+                      ref.read(homeToastProvider.notifier).show(
+                            'البطولات قيد التنفيذ — ستتوفر قريباً',
+                          );
+                      return;
+                    }
+                    context.push('/tournaments');
+                  },
             tournaments: true,
           ),
         );
@@ -563,6 +592,7 @@ class _HomeCubeCard extends StatelessWidget {
     required this.onTap,
     this.icon,
     this.tournaments = false,
+    this.locked = false,
   });
 
   final double size;
@@ -570,10 +600,13 @@ class _HomeCubeCard extends StatelessWidget {
   final VoidCallback onTap;
   final IconData? icon;
   final bool tournaments;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Opacity(
+      opacity: locked ? 0.58 : 1,
+      child: SizedBox(
       width: size,
       height: size,
       child: Material(
@@ -635,6 +668,7 @@ class _HomeCubeCard extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

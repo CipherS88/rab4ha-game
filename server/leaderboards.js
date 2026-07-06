@@ -218,12 +218,14 @@ function listRankKings() {
 
 function listTournamentLeaders() {
   const rows = db.prepare(`
-    SELECT p.championship_stars, p.rank, p.sub_rank, p.champion_medals,
+    SELECT COALESCE(p.recreational_tournament_points, 0) AS rec_points,
+      p.rank, p.sub_rank, p.champion_medals,
       u.id AS user_id, u.display_name, u.player_code, u.avatar_url, u.avatar_removed_until,
       u.role, u.is_vip, u.is_famous, u.vip_expires_at
     FROM players p
     JOIN users u ON p.device_id = ('user_' || u.id)
-    ORDER BY COALESCE(p.championship_stars, 0) DESC, u.display_name ASC
+    WHERE COALESCE(p.recreational_tournament_points, 0) > 0
+    ORDER BY rec_points DESC, u.display_name ASC
     LIMIT ?
   `).all(LEADERBOARD_LIMIT);
 
@@ -234,14 +236,14 @@ function listTournamentLeaders() {
 
   const entries = rows.map((r, i) => buildLeaderboardEntry({ ...r, id: r.user_id }, r, {
     position: i + 1,
-    score: r.championship_stars,
-    score_label: `${r.championship_stars ?? 0} ⭐`,
+    score: r.rec_points,
+    score_label: `${r.rec_points ?? 0} 🏅`,
   }));
 
   return {
     type: 'tournament_stars',
-    title: 'متصدرين البطولات',
-    subtitle: 'النجوم من الفوز في البطولات الترفيهية',
+    title: 'أبطال البطولات الترفيهية',
+    subtitle: 'ترتيب اللاعبين حسب نقاط البطولات الترفيهية (غير قابلة للتداول)',
     total: entries.length,
     registered_players: allWithZero,
     entries,
@@ -305,12 +307,12 @@ function attachMyEntry(result, viewerId) {
       `).get(wk, score, score, row?.wins ?? 0)?.pos ?? null;
     }
   } else if (result.type === 'tournament_stars') {
-    score = player?.championship_stars ?? 0;
-    scoreLabel = `${score} ⭐`;
+    score = player?.recreational_tournament_points ?? 0;
+    scoreLabel = `${score} 🏅`;
     if (score > 0) {
       position = db.prepare(`
         SELECT COUNT(*) + 1 AS pos FROM players
-        WHERE COALESCE(championship_stars, 0) > ?
+        WHERE COALESCE(recreational_tournament_points, 0) > ?
       `).get(score)?.pos ?? null;
     }
   } else if (result.type === 'charisma') {

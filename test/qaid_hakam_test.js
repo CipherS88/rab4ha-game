@@ -137,7 +137,7 @@ for (const [level, expected] of [[1, 16], [2, 32], [3, 48], [4, 64]]) {
   const e = hakamEngine({ doubleLevel: 5 });
   e.tricks_won = { 1: 2, 2: 2 };
   e.finalize_round(2, 'qaid', { qaid_loser_tricks: 2 });
-  assert.strictEqual(e.summary_data.final[2], 152);
+  assert.strictEqual(e.summary_data.final[2], 150);
   assert.strictEqual(e.summary_data.final[1], 0);
 }
 

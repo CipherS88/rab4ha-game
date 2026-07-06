@@ -71,12 +71,12 @@ class MatchmakingScreen extends ConsumerWidget {
             const SizedBox(height: 24),
             if (mm.error != null) Text(mm.error!, style: TextStyle(color: c.danger)),
             const Spacer(),
-            if (!mm.solo)
+            if (!mm.solo && mm.mode != 'ranked')
               PrimaryButton(
                 label: 'ملء بالروبوت',
                 onPressed: () => ref.read(gameControllerProvider.notifier).fillBots(),
               ),
-            const SizedBox(height: 12),
+            if (!mm.solo && mm.mode != 'ranked') const SizedBox(height: 12),
             SecondaryButton(
               label: 'مغادرة',
               onPressed: () async {

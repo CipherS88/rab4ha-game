@@ -98,15 +98,67 @@ class DealingOverlay extends StatelessWidget {
 }
 
 /// P29 — عرض المشاريع المكشوفة.
-class ProjectSpreadsOverlay extends StatelessWidget {
+class ProjectSpreadsOverlay extends StatefulWidget {
   const ProjectSpreadsOverlay({required this.game, super.key});
   final GameState game;
 
+  @override
+  State<ProjectSpreadsOverlay> createState() => _ProjectSpreadsOverlayState();
+}
+
+class _ProjectSpreadsOverlayState extends State<ProjectSpreadsOverlay> {
   static const _anchors = seatSpreadAnchors;
+
+  /// المقاعد التي حان دورها في اللّفة الثانية فتنفرش مشاريعها.
+  final Set<int> _revealedSeats = {};
+  int? _trackedTrick;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncReveal();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProjectSpreadsOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncReveal();
+  }
+
+  /// ربط بداية ظهور المشاريع بحدث "استلام الدور" في اللّفة الثانية.
+  void _syncReveal() {
+    final gs = widget.game.gs;
+    if (gs == null) return;
+    final trick = gs['trick_count'] as int?;
+
+    // خارج اللّفة الثانية: صفّر حالة الإظهار (تُخفى المشاريع).
+    if (trick != 2) {
+      if (_revealedSeats.isNotEmpty) _revealedSeats.clear();
+      _trackedTrick = trick;
+      return;
+    }
+
+    // بداية اللّفة الثانية: ابدأ من جديد.
+    if (_trackedTrick != 2) {
+      _revealedSeats.clear();
+      _trackedTrick = 2;
+    }
+
+    // المقاعد التي لعبت فعلاً في اللّفة الثانية حان دورها سابقاً.
+    final currentTrick = gs['current_trick'] as List? ?? [];
+    for (final item in currentTrick) {
+      final p = (item as Map?)?['player'] as int?;
+      if (p != null && p >= 0) _revealedSeats.add(p);
+    }
+
+    // المقعد صاحب الدور الحالي: حان دوره الآن فتنفرش مشاريعه.
+    final turn = gs['turn'] as int?;
+    if (turn != null && turn >= 0) _revealedSeats.add(turn);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final gs = game.gs!;
+    final gs = widget.game.gs!;
     if (gs['phase'] != 'PLAYING' || gs['sawa_declaration'] != null) {
       return const SizedBox.shrink();
     }
@@ -116,7 +168,7 @@ class ProjectSpreadsOverlay extends StatelessWidget {
     final counts = gs['hand_counts'] as List? ?? [];
     final back = gs['card_back_url']?.toString() ?? '/cards/back_dark.png';
     final dims = rab4haDims(context);
-    final mySeat = game.mySeat ?? 0;
+    final mySeat = widget.game.mySeat ?? 0;
 
     return Stack(
       children: visualPositions.map((pos) {
@@ -124,6 +176,8 @@ class ProjectSpreadsOverlay extends StatelessWidget {
         if (gSeat >= counts.length || (counts[gSeat] as int? ?? 0) <= 6) {
           return const SizedBox.shrink();
         }
+        // لا تُفرش مشاريع المقعد إلا بعد أن يحين دوره في اللّفة الثانية.
+        if (!_revealedSeats.contains(gSeat)) return const SizedBox.shrink();
         final spreadCards = (spreads['$gSeat'] as List?) ??
             (reveals['$gSeat'] is Map ? (reveals['$gSeat'] as Map)['cards'] as List? : null);
         if (spreadCards == null || spreadCards.isEmpty) return const SizedBox.shrink();
@@ -200,9 +254,15 @@ class _SawaSpreadsOverlayState extends ConsumerState<SawaSpreadsOverlay> {
     Rab4haDimensions dims,
     int? mySeat,
   ) {
+    final declarerSeat = decl['seat'] as int?;
     return visualPositions.map((pos) {
       final gSeat = getGlobalSeat(pos, mySeat);
-      if (!isSawaOpponentSeat(gSeat, decl)) return const SizedBox.shrink();
+      // المُعلِن تُعرض كروته سكاتر في المنتصف
+      if (gSeat == declarerSeat) return const SizedBox.shrink();
+      // مقعدي السفلي: إن كنت شريك المُعلِن فيدي الحقيقية ظاهرة فلا نكرر الفرش
+      if (pos == 'bottom' && !isSawaOpponentSeat(gSeat, decl)) {
+        return const SizedBox.shrink();
+      }
       List? cards;
       String? name;
       for (final h in hands) {

@@ -16,7 +16,7 @@ const { initChatSchema, purgeExpiredDm } = require('./chat');
 const { createChatRouter } = require('./chatRoutes');
 const { createGiftsRouter } = require('./giftRoutes');
 const { initGiftsSchema } = require('./gifts');
-const { initTournamentEngineSchema, syncAllTournaments } = require('./tournamentEngine');
+const { initTournamentEngineSchema, syncAllTournaments, setTournamentGameManager } = require('./tournamentEngine');
 const { initLeaderboardsSchema, processWeekRollover } = require('./leaderboards');
 const { initPlayRadarSchema } = require('./playRadar');
 const { createLeaderboardsRouter } = require('./leaderboardRoutes');
@@ -69,6 +69,8 @@ const PUBLIC_PATH = path.join(__dirname, '..', 'public');
 const FLUTTER_WEB_PATH = path.join(__dirname, '..', 'rab4ha_flutter', 'build', 'web');
 
 const gameManager = new GameManager();
+// اربط مدير اللعبة بمحرك البطولات لإنشاء غرف المباريات الحقيقية عند بدء البطولة.
+setTournamentGameManager(gameManager);
 
 app.use('/api/admin', createAdminRouter(gameManager));
 app.use('/api/auth', createAuthRouter());
@@ -130,7 +132,13 @@ io.on('connection', (socket) => {
     if (!room) return cb?.({ error: 'غير متصل' });
     const seat = gameManager.resolveSeat(socket, data.actAs);
     if (seat < 0) return cb?.({ error: 'مقعد غير صالح' });
-    const result = room.handlePlayCard(seat, data.cardIndex, data.projects, data.playMs);
+    const result = room.handlePlayCard(
+      seat,
+      data.cardIndex,
+      data.projects,
+      data.playMs,
+      data.is_ekkah_declared,
+    );
     cb?.(result);
   });
 
@@ -205,7 +213,13 @@ io.on('connection', (socket) => {
     const room = gameManager.getRoom(socket);
     if (!room) return cb?.({ error: 'غير متصل' });
     const seat = room.findSeatBySocket(socket.id);
-    if (seat < 0) return cb?.({ error: 'مقعد غير صالح' });
+    if (seat < 0) {
+      // مشاهد يرسل هدية للاعبين على الطاولة
+      if (room.isSpectator(socket.id)) {
+        return cb?.(room.handleSpectatorGift(socket.id, data));
+      }
+      return cb?.({ error: 'مقعد غير صالح' });
+    }
     const result = room.handleTableGift(seat, data);
     cb?.(result);
   });

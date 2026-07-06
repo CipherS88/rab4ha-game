@@ -29,7 +29,8 @@ function playingEngine() {
   e.finalize_round(1, 'sawa');
   assert.strictEqual(e.summary_data.ground[1], 10);
   assert.strictEqual(e.summary_data.ground[2], 0);
-  assert.strictEqual(e.summary_data.final[1], 44);
+  assert.strictEqual(e.summary_data.final[1], e.summary_data.base_final[1]);
+  assert.strictEqual(e.summary_data.final[2], e.summary_data.base_final[2]);
 }
 
 // قيد → لا أرض

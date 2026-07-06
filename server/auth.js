@@ -847,17 +847,38 @@ function listTournaments(type = null, viewerId = null) {
     };
   };
   if (type) {
-    sql += ` WHERE t.type = ? ORDER BY t.created_at DESC`;
+    sql += ` WHERE t.type = ? AND t.status IN ('registration', 'lobby', 'active') ORDER BY t.created_at DESC`;
     return db.prepare(sql).all(type).map(mapRow);
   }
-  sql += ` ORDER BY t.created_at DESC LIMIT 40`;
+  sql += ` WHERE t.status IN ('registration', 'lobby', 'active') ORDER BY t.created_at DESC LIMIT 40`;
   return db.prepare(sql).all().map(mapRow);
 }
 
 function createTournament(user, data) {
-  const { type, title, size, match_format } = data;
+  const { type, title, size, match_format, custom_deck_key, custom_bg_key } = data;
   if (!VALID_SIZES.includes(size)) return { error: 'حجم البطولة غير صالح' };
   if (!VALID_FORMATS.includes(match_format)) return { error: 'نظام المباريات غير صالح' };
+
+  const { TOURNAMENT_CREATE_FEE, TOURNAMENT_CUSTOMIZE_FEE } = require('./tournamentConstants');
+  const { userCanUseStoreAsset } = require('./bag');
+
+  const deckKey = String(custom_deck_key || '').trim();
+  const bgKey = String(custom_bg_key || '').trim();
+  const hasCustom = !!(deckKey || bgKey);
+
+  if (deckKey && !userCanUseStoreAsset(user.id, 'cards', deckKey)) {
+    return { error: 'ظهر الكروت المختار غير متوفر في حقيبتك' };
+  }
+  if (bgKey && !userCanUseStoreAsset(user.id, 'session_bg', bgKey)) {
+    return { error: 'خلفية الطاولة المختارة غير متوفرة في حقيبتك' };
+  }
+
+  const totalFee = TOURNAMENT_CREATE_FEE + (hasCustom ? TOURNAMENT_CUSTOMIZE_FEE : 0);
+  const deviceId = deviceIdForUser(user.id);
+  const profile = getOrCreatePlayer(deviceId, user.display_name || 'لاعب');
+  if ((profile.coins || 0) < totalFee) {
+    return { error: `رصيد غير كافٍ — تحتاج ${totalFee} عملة (إنشاء ${TOURNAMENT_CREATE_FEE}${hasCustom ? ` + تخصيص ${TOURNAMENT_CUSTOMIZE_FEE}` : ''})` };
+  }
 
   if (type === 'pro') {
     return { error: 'البطولات الاحترافية تُدار من لوحة الأدمن' };
@@ -876,10 +897,13 @@ function createTournament(user, data) {
     return { error: 'نوع بطولة غير صالح' };
   }
 
+  profile.coins = (profile.coins || 0) - totalFee;
+  savePlayer(profile);
+
   const info = db.prepare(`
-    INSERT INTO tournaments (type, title, creator_id, size, match_format)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(type, (title || 'بطولة بلوت').slice(0, 50), user.id, size, match_format);
+    INSERT INTO tournaments (type, title, creator_id, size, match_format, custom_deck_key, custom_bg_key)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(type, (title || 'بطولة بلوت').slice(0, 50), user.id, size, match_format, deckKey, bgKey);
 
   db.prepare('INSERT INTO tournament_entries (tournament_id, user_id) VALUES (?, ?)').run(info.lastInsertRowid, user.id);
 
@@ -898,11 +922,17 @@ function createTournament(user, data) {
       ...tournamentSummaryFields(row),
       creator: getTournamentCreatorCard(row.creator_id, user.id),
     },
+    fee_paid: totalFee,
+    coins_remaining: profile.coins,
   };
 }
 
-function joinTournament(user, tournamentId) {
-  const { syncTournamentPhase } = require('./tournamentEngine');
+function joinTournament(user, tournamentId, captchaData = {}) {
+  const { verifyJoinCaptcha } = require('./tournamentCaptcha');
+  const cap = verifyJoinCaptcha(captchaData.captcha_token, captchaData.captcha_answer);
+  if (cap.error) return { error: cap.error };
+
+  const { syncTournamentPhase, startTournament } = require('./tournamentEngine');
   syncTournamentPhase(tournamentId);
   const t = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournamentId);
   if (!t) return { error: 'البطولة غير موجودة' };
@@ -914,7 +944,59 @@ function joinTournament(user, tournamentId) {
   } catch {
     return { ok: true };
   }
+  startTournament(tournamentId);
   return { ok: true };
+}
+
+/**
+ * ملء بطولة بحسابات بوت (لأغراض الاختبار — للأدمن فقط).
+ * يُنشئ/يعيد استخدام حسابات بوت (role='bot') ويسجّلها كمشاركين حتى يكتمل حجم البطولة.
+ */
+function fillTournamentWithBots(tournamentId) {
+  const { syncTournamentPhase } = require('./tournamentEngine');
+  syncTournamentPhase(tournamentId);
+  const t = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournamentId);
+  if (!t) return { error: 'البطولة غير موجودة' };
+  if (t.status !== 'registration') return { error: 'يمكن الملء فقط أثناء مرحلة التسجيل' };
+
+  const currentIds = db.prepare('SELECT user_id FROM tournament_entries WHERE tournament_id = ?')
+    .all(tournamentId).map((r) => r.user_id);
+  const needed = t.size - currentIds.length;
+  if (needed <= 0) return { ok: true, added: 0 };
+
+  const insertEntry = db.prepare('INSERT OR IGNORE INTO tournament_entries (tournament_id, user_id) VALUES (?, ?)');
+  const used = new Set(currentIds);
+  let added = 0;
+
+  for (let i = 1; added < needed && i <= 512; i++) {
+    const username = `__tbot_${i}`;
+    let bot = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    if (!bot) {
+      try {
+        const info = db.prepare(`
+          INSERT INTO users (username, password_hash, role, is_vip, display_name, player_code)
+          VALUES (?, ?, 'bot', 0, ?, ?)
+        `).run(username, hashPassword(`bot_${crypto.randomBytes(6).toString('hex')}`), `بوت ${i}`, generateUniquePlayerCode());
+        bot = { id: info.lastInsertRowid };
+      } catch (_) {
+        continue;
+      }
+    }
+    if (used.has(bot.id)) continue;
+    insertEntry.run(tournamentId, bot.id);
+    used.add(bot.id);
+    added++;
+  }
+
+  // قد يكتمل الحجم الآن → زامن المرحلة لينتقل تلقائياً للّوبي/النشطة.
+  syncTournamentPhase(tournamentId);
+  return { ok: true, added };
+}
+
+function isBotUser(userId) {
+  if (!userId) return false;
+  const row = db.prepare('SELECT role FROM users WHERE id = ?').get(userId);
+  return row?.role === 'bot';
 }
 
 function getInventory(userId) {
@@ -974,6 +1056,8 @@ module.exports = {
   listTournaments,
   createTournament,
   joinTournament,
+  fillTournamentWithBots,
+  isBotUser,
   closeAllOpenTournaments,
   getCasualQuota,
   getCasualLimit,

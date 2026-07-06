@@ -31,6 +31,7 @@ class GameState {
     this.qaidReason,
     this.qaidCards = const [],
     this.qaidModalOpen = false,
+    this.qaidSubmitting = false,
     this.matchEnd,
     this.error,
     this.tableGiftSlots,
@@ -44,10 +45,14 @@ class GameState {
     this.animatingThrowSeat,
     this.roomCloseSignal = 0,
     this.activeRoomId,
+    this.isSpectator = false,
+    this.ekkahToggle = false,
+    this.ekkahToast,
   });
 
   final int? mySeat;
   final bool soloMode;
+  final bool isSpectator;
   final String matchMode;
   final String? sessionId;
   final String? activeRoomId;
@@ -60,6 +65,7 @@ class GameState {
   final String? qaidReason;
   final List<Map<String, dynamic>> qaidCards;
   final bool qaidModalOpen;
+  final bool qaidSubmitting;
   final Map<String, dynamic>? matchEnd;
   final String? error;
   final List<dynamic>? tableGiftSlots;
@@ -72,8 +78,21 @@ class GameState {
   final int? animatingThrowSeat;
   final Map<int, int> trickThrowAtMs;
   final int roomCloseSignal;
+  final bool ekkahToggle;
+  final String? ekkahToast;
 
   Map<String, dynamic>? get gs => gameState;
+
+  bool get canDeclareEkkah {
+    if (isSpectator || gs == null) return false;
+    if (gs!['phase'] != 'PLAYING') return false;
+    if (gs!['qaid_session'] != null) return false;
+    if (gs!['sawa_declaration'] != null) return false;
+    if (gs!['bid']?['type'] != 'HAKAM') return false;
+    if (!isMyTurnToAct()) return false;
+    final trick = gs!['current_trick'] as List?;
+    return trick == null || trick.isEmpty;
+  }
 
   GameState copyWith({
     int? mySeat,
@@ -89,6 +108,7 @@ class GameState {
     String? qaidReason,
     List<Map<String, dynamic>>? qaidCards,
     bool? qaidModalOpen,
+    bool? qaidSubmitting,
     Map<String, dynamic>? matchEnd,
     String? error,
     List<dynamic>? tableGiftSlots,
@@ -102,9 +122,14 @@ class GameState {
     Map<int, int>? trickThrowAtMs,
     int? roomCloseSignal,
     String? activeRoomId,
+    bool? isSpectator,
+    bool? ekkahToggle,
+    String? ekkahToast,
     bool clearTrickCollect = false,
     bool clearTableGiftFly = false,
     bool clearTableGiftToast = false,
+    bool clearEkkahToast = false,
+    bool clearEkkahToggle = false,
     bool clearAnimatingThrow = false,
     bool clearMatchEnd = false,
     bool clearPreSelect = false,
@@ -126,6 +151,7 @@ class GameState {
         qaidReason: clearQaidReason ? null : (qaidReason ?? this.qaidReason),
         qaidCards: qaidCards ?? this.qaidCards,
         qaidModalOpen: qaidModalOpen ?? this.qaidModalOpen,
+        qaidSubmitting: qaidSubmitting ?? this.qaidSubmitting,
         matchEnd: clearMatchEnd ? null : (matchEnd ?? this.matchEnd),
         error: error,
         tableGiftSlots: tableGiftSlots ?? this.tableGiftSlots,
@@ -141,6 +167,9 @@ class GameState {
         trickThrowAtMs: trickThrowAtMs ?? this.trickThrowAtMs,
         roomCloseSignal: roomCloseSignal ?? this.roomCloseSignal,
         activeRoomId: activeRoomId ?? this.activeRoomId,
+        isSpectator: isSpectator ?? this.isSpectator,
+        ekkahToggle: clearEkkahToggle ? false : (ekkahToggle ?? this.ekkahToggle),
+        ekkahToast: clearEkkahToast ? null : (ekkahToast ?? this.ekkahToast),
       );
 
   int? get controlSeat {
@@ -213,6 +242,7 @@ class GameController extends Notifier<GameState> {
     listen('qaid_ended', (_) {
       state = state.copyWith(
         qaidModalOpen: false,
+        qaidSubmitting: false,
         qaidStep: 1,
         clearQaidReason: true,
         qaidCards: const [],
@@ -229,6 +259,7 @@ class GameController extends Notifier<GameState> {
       _showDealingBriefly();
     });
     listen('table_gift', (d) => _onTableGift(Map<String, dynamic>.from(d as Map)));
+    listen('ekkah_declared', (d) => _onEkkahDeclared(Map<String, dynamic>.from(d as Map)));
     listen('emergency_play', (_) {});
   }
 
@@ -259,6 +290,18 @@ class GameController extends Notifier<GameState> {
   }
 
   void _onTrickResolved(Map<String, dynamic> d) {
+    if (state.isSpectator && d['cards'] is List) {
+      d = {
+        ...d,
+        'cards': (d['cards'] as List).map((e) {
+          final item = Map<String, dynamic>.from(e as Map);
+          if (item['card'] is Map) {
+            item['card'] = {...Map<String, dynamic>.from(item['card'] as Map), 'hidden': true};
+          }
+          return item;
+        }).toList(),
+      };
+    }
     state = state.copyWith(trickCollect: d, trickThrowAtMs: {});
     Future.delayed(const Duration(milliseconds: 440), () {
       state = state.copyWith(clearTrickCollect: true);
@@ -408,6 +451,69 @@ class GameController extends Notifier<GameState> {
     return completer.future;
   }
 
+  /// الدخول كمشاهد لجلسة جارية — لا يشغل مقعداً ولا يرى وجوه الكروت.
+  Future<Map<String, dynamic>?> spectateRoom({
+    required String roomId,
+    required String name,
+    String? sessionId,
+  }) async {
+    final userId = ref.read(authProvider).user?.id;
+    final completer = Completer<Map<String, dynamic>?>();
+    _emit('join', {
+      'roomId': roomId,
+      'name': name,
+      'userId': userId,
+      'spectate': true,
+    }, (res) {
+      final map = res is Map ? Map<String, dynamic>.from(res) : null;
+      if (map?['error'] != null) {
+        state = state.copyWith(error: map!['error'].toString());
+        completer.complete(map);
+        return;
+      }
+      state = state.copyWith(
+        isSpectator: true,
+        soloMode: false,
+        matchMode: 'session',
+        sessionId: sessionId,
+        activeRoomId: map?['roomId']?.toString() ?? roomId,
+        mySeat: 0,
+        room: map?['room'] is Map
+            ? Map<String, dynamic>.from(map!['room'] as Map)
+            : null,
+        error: null,
+      );
+      completer.complete(map);
+    });
+    return completer.future;
+  }
+
+  /// إخفاء وجوه كل الكروت للمشاهد — يرى الخلفيات فقط.
+  Map<String, dynamic> _maskCardsForSpectator(Map<String, dynamic> pub) {
+    Map<String, dynamic> hide(Map src) =>
+        {...Map<String, dynamic>.from(src), 'hidden': true};
+
+    final masked = Map<String, dynamic>.from(pub);
+    masked['my_hand'] = const [];
+    masked['my_hand_count'] = 0;
+    masked['legal_cards'] = const [];
+
+    if (masked['floor_card'] is Map) {
+      masked['floor_card'] = hide(masked['floor_card'] as Map);
+    }
+    if (masked['current_trick'] is List) {
+      masked['current_trick'] = (masked['current_trick'] as List).map((e) {
+        final item = Map<String, dynamic>.from(e as Map);
+        if (item['card'] is Map) item['card'] = hide(item['card'] as Map);
+        return item;
+      }).toList();
+    }
+    // إخفاء أي كشف كامل للأيدي (سوا / قيد) عن المشاهد
+    masked['sawa_hands'] = null;
+    masked['all_hands'] = const [];
+    return masked;
+  }
+
   void fillBots() {
     _emit('fill_bots', {}, (res) {
       if (res is Map && res['error'] != null) {
@@ -518,7 +624,8 @@ class GameController extends Notifier<GameState> {
     _handlePreSelectAutoPlay();
   }
 
-  void _onGamePublic(Map<String, dynamic> pub) {
+  void _onGamePublic(Map<String, dynamic> rawPub) {
+    final pub = state.isSpectator ? _maskCardsForSpectator(rawPub) : rawPub;
     final prevTrick = (state.gs?['current_trick'] as List?) ?? [];
     if (state.soloMode && state.gs?['soloStates'] != null) {
       final list = (state.gs!['soloStates'] as List)
@@ -644,6 +751,21 @@ class GameController extends Notifier<GameState> {
     });
   }
 
+  void _onEkkahDeclared(Map<String, dynamic> data) {
+    final name = data['name']?.toString() ?? 'لاعب';
+    state = state.copyWith(ekkahToast: 'إكة من اللاعب $name');
+    Future.delayed(const Duration(seconds: 3), () {
+      if (state.ekkahToast == 'إكة من اللاعب $name') {
+        state = state.copyWith(clearEkkahToast: true);
+      }
+    });
+  }
+
+  void toggleEkkah() {
+    if (!state.canDeclareEkkah) return;
+    state = state.copyWith(ekkahToggle: !state.ekkahToggle);
+  }
+
   void playCard(int idx) {
     if (state.gs?['qaid_session'] != null) return;
     final playMs = _myTurnStartedAt != null
@@ -652,16 +774,18 @@ class GameController extends Notifier<GameState> {
     _myTurnStartedAt = null;
     final seat = state.controlSeat ?? state.mySeat;
     if (seat != null) _markTrickThrow(seat);
+    final declareEkkah = state.ekkahToggle;
     _emit('play_card', {
       'cardIndex': idx,
       'projects': state.pendingProjects,
       'playMs': playMs,
+      if (declareEkkah) 'is_ekkah_declared': true,
     }, (res) {
       if (res is Map && res['error'] != null) {
         state = state.copyWith(error: res['error'].toString());
       }
     });
-    state = state.copyWith(clearPreSelect: true);
+    state = state.copyWith(clearPreSelect: true, clearEkkahToggle: true);
   }
 
   void onCardTap(int serverIdx, Map<String, dynamic> card) {
@@ -717,30 +841,51 @@ class GameController extends Notifier<GameState> {
   }
 
   void qaidUpdate({String? reason, List<Map<String, dynamic>>? cards}) {
+    final reasonChanged = reason != null && reason != state.qaidReason;
+    final nextReason = reason ?? state.qaidReason;
+    final List<Map<String, dynamic>> nextCards = reasonChanged
+        ? const <Map<String, dynamic>>[]
+        : (cards ?? state.qaidCards);
     _emit('qaid_update', {
-      if (reason != null) 'reason': reason,
-      if (cards != null) 'cards': cards,
+      if (reason != null) 'reason': qaidReasonForWire(reason),
+      if (cards != null || reasonChanged) 'cards': nextCards,
     });
     state = state.copyWith(
-      qaidReason: reason ?? state.qaidReason,
-      qaidCards: cards ?? state.qaidCards,
+      qaidReason: nextReason,
+      qaidCards: nextCards,
+      qaidStep: reasonChanged ? 1 : state.qaidStep,
     );
   }
 
   void qaidSubmit() {
+    if (state.qaidSubmitting) return;
+    if (!canSubmitQaid(
+      reason: state.qaidReason,
+      cards: state.qaidCards,
+      submitting: false,
+    )) {
+      return;
+    }
+    state = state.copyWith(qaidSubmitting: true, qaidModalOpen: false);
     _emit('qaid_submit', {
-      'reason': state.qaidReason,
+      'reason': qaidReasonForWire(state.qaidReason),
       'cards': state.qaidCards,
     }, (res) {
       if (res is Map && res['error'] != null) {
-        state = state.copyWith(error: res['error'].toString());
+        state = state.copyWith(
+          qaidSubmitting: false,
+          qaidModalOpen: true,
+          error: res['error'].toString(),
+        );
+      } else {
+        state = state.copyWith(qaidSubmitting: false);
       }
     });
   }
 
   void qaidCancel() {
     _emit('qaid_cancel', {});
-    state = state.copyWith(qaidModalOpen: false);
+    state = state.copyWith(qaidModalOpen: false, qaidSubmitting: false);
   }
 
   void sawa() => _emit('sawa', {});
@@ -759,7 +904,7 @@ class GameController extends Notifier<GameState> {
     final localStep = state.qaidStep;
     final sessionReason = session['reason']?.toString();
     final reason = (sessionReason != null && sessionReason.isNotEmpty)
-        ? sessionReason
+        ? (objector ? (localReason ?? qaidReasonFromWire(sessionReason)) : qaidReasonFromWire(sessionReason))
         : (objector ? localReason : null);
 
     List<Map<String, dynamic>> cards;
@@ -772,7 +917,7 @@ class GameController extends Notifier<GameState> {
       cards = const [];
     }
 
-    var step = inferQaidStepFromSession(session, objector, localStep);
+    var step = inferQaidStepFromSession(session, objector, localStep, reason);
     if (objector && (sessionReason == null || sessionReason.isEmpty)) {
       step = localStep;
     }

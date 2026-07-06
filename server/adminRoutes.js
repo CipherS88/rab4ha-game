@@ -37,11 +37,112 @@ const { saveUploadedImage } = require('./uploads');
 const { listCategoryAssets, saveStoreAssetImage, saveStoreAssetBuffer } = require('./assetFolders');
 const { getHomeLayout, saveHomeLayout, resetHomeLayout } = require('./homeLayout');
 const { getGameLayout, saveGameLayout, resetGameLayout } = require('./gameLayout');
+const {
+  getMaintenance,
+  setMaintenance,
+  getSystemStats,
+  searchUsers,
+  getUserProfileAdmin,
+  banUserAccount,
+  unbanUserAccount,
+  adjustUserBalance,
+  listGiftLog,
+} = require('./adminDashboard');
 
 function createAdminRouter(gameManager) {
   const router = express.Router();
   router.use(authMiddleware);
   router.use(adminMiddleware);
+
+  // ── لوحة التحكم: إحصائيات حية ──
+  router.get('/dashboard/stats', (_req, res) => {
+    res.json({ stats: getSystemStats(gameManager) });
+  });
+
+  // ── الغرف النشطة (Live Rooms) ──
+  router.get('/dashboard/rooms', (_req, res) => {
+    res.json({ rooms: gameManager ? gameManager.getAdminRooms() : [] });
+  });
+
+  router.post('/dashboard/rooms/:roomId/kill', (req, res) => {
+    if (!gameManager) return res.status(500).json({ error: 'الخادم غير جاهز' });
+    const result = gameManager.killRoom(req.params.roomId);
+    if (result.error) return res.status(404).json({ error: result.error });
+    res.json(result);
+  });
+
+  // ── إدارة اللاعبين المتقدمة ──
+  router.get('/dashboard/users/search', (req, res) => {
+    res.json({ users: searchUsers(req.query.q || '') });
+  });
+
+  router.get('/dashboard/users/:id', (req, res) => {
+    const result = getUserProfileAdmin(parseInt(req.params.id, 10));
+    if (result.error) return res.status(404).json({ error: result.error });
+    res.json(result);
+  });
+
+  router.post('/dashboard/users/:id/ban', (req, res) => {
+    const result = banUserAccount(parseInt(req.params.id, 10), req.body?.reason);
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.json(result);
+  });
+
+  router.post('/dashboard/users/:id/unban', (req, res) => {
+    const result = unbanUserAccount(parseInt(req.params.id, 10));
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.json(result);
+  });
+
+  router.post('/dashboard/users/:id/balance', (req, res) => {
+    const result = adjustUserBalance(parseInt(req.params.id, 10), {
+      coins: req.body?.coins,
+      gems: req.body?.gems,
+    });
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.json(result);
+  });
+
+  router.post('/dashboard/users/:id/warn', (req, res) => {
+    if (!gameManager) return res.status(500).json({ error: 'الخادم غير جاهز' });
+    const message = String(req.body?.message || '').trim();
+    if (!message) return res.status(400).json({ error: 'نص الرسالة مطلوب' });
+    res.json(gameManager.warnUser(parseInt(req.params.id, 10), message));
+  });
+
+  // ── التحكم بالنظام: صيانة وإعلانات ──
+  router.get('/dashboard/maintenance', (_req, res) => {
+    res.json(getMaintenance());
+  });
+
+  router.post('/dashboard/maintenance', (req, res) => {
+    const state = setMaintenance(!!req.body?.enabled, req.body?.message || '');
+    // تنبيه اللاعبين المتصلين عند تفعيل الصيانة.
+    if (state.enabled && gameManager) {
+      gameManager.announce(
+        state.message || 'الخادم سيدخل وضع الصيانة قريباً',
+        'maintenance',
+      );
+    }
+    res.json(state);
+  });
+
+  router.post('/dashboard/announce', (req, res) => {
+    if (!gameManager) return res.status(500).json({ error: 'الخادم غير جاهز' });
+    const message = String(req.body?.message || '').trim();
+    if (!message) return res.status(400).json({ error: 'نص الإعلان مطلوب' });
+    res.json(gameManager.announce(message, req.body?.level || 'info'));
+  });
+
+  // ── سجل عمليات الهدايا ──
+  router.get('/dashboard/gifts/log', (req, res) => {
+    res.json({
+      log: listGiftLog({
+        limit: req.query.limit,
+        adminOnly: req.query.admin_only === '1' || req.query.admin_only === 'true',
+      }),
+    });
+  });
 
   router.post(
     '/store/upload-asset-file',

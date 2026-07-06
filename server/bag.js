@@ -127,6 +127,48 @@ function getBagAchievements(userId) {
   }));
 }
 
+function getBagBadges(userId) {
+  return db.prepare(`
+    SELECT id, item_key, label, image_url, item_type, earned_at
+    FROM inventory
+    WHERE user_id = ? AND item_type = 'badge'
+    ORDER BY earned_at DESC
+  `).all(userId).map((r) => ({
+    id: r.id,
+    item_key: r.item_key,
+    label: r.label,
+    image_url: r.image_url || '',
+    earned_at: r.earned_at,
+    non_tradable: true,
+  }));
+}
+
+/** تطبيق تخصيص البطولة على غرف المباريات. */
+function resolveTournamentCosmetics(customDeckKey, customBgKey) {
+  const out = {};
+  if (customDeckKey) {
+    const row = db.prepare(`
+      SELECT image_url FROM store_products
+      WHERE asset_key = ? AND category = 'cards' AND is_active = 1
+    `).get(customDeckKey);
+    if (row?.image_url) out.cardBackUrl = resolveDeckBack(row.image_url);
+  }
+  if (customBgKey) {
+    const row = db.prepare(`
+      SELECT image_url FROM store_products
+      WHERE asset_key = ? AND category = 'session_bg' AND is_active = 1
+    `).get(customBgKey);
+    if (row?.image_url) out.sessionBgUrl = row.image_url;
+  }
+  return out;
+}
+
+function userCanUseStoreAsset(userId, category, assetKey) {
+  if (!assetKey) return false;
+  const items = getBagStoreItems(userId).filter((i) => i.category === category);
+  return items.some((i) => i.asset_key === assetKey);
+}
+
 function getDisplayBadges(userId, maxSlots = 4) {
   const rows = db.prepare(`
     SELECT id, item_key, label, image_url, item_type, earned_at
@@ -260,6 +302,8 @@ function getBag(userId) {
   return {
     store_items: getBagStoreItems(userId),
     achievements: getBagAchievements(userId),
+    badges: getBagBadges(userId),
+    tournament_points: getTournamentPointsPouch(userId),
     showcase: getPlayerShowcase(userId),
   };
 }
@@ -272,6 +316,40 @@ function grantAchievement(userId, itemKey, label, imageUrl = '') {
     VALUES (?, ?, ?, ?, 'achievement')
   `).run(userId, itemKey, label, imageUrl || '');
   return { ok: true };
+}
+
+function grantBadge(userId, itemKey, label, imageUrl = '') {
+  const exists = db.prepare('SELECT id FROM inventory WHERE user_id = ? AND item_key = ?').get(userId, itemKey);
+  if (exists) return { ok: true, duplicate: true };
+  db.prepare(`
+    INSERT INTO inventory (user_id, item_key, label, image_url, item_type)
+    VALUES (?, ?, ?, ?, 'badge')
+  `).run(userId, itemKey, label, imageUrl || '');
+  return { ok: true };
+}
+
+/** نقاط البطولات الترفيهية — عنصر واحد غير قابل للتداول في الحقيبة. */
+function grantOrUpdateTournamentPointsPouch(userId, totalPoints, lastReason = '') {
+  const itemKey = 'rec_tournament_points';
+  const label = `🏅 نقاط البطولات: ${totalPoints}${lastReason ? ` (${lastReason})` : ''}`;
+  const existing = db.prepare('SELECT id FROM inventory WHERE user_id = ? AND item_key = ?').get(userId, itemKey);
+  if (existing) {
+    db.prepare('UPDATE inventory SET label = ?, earned_at = datetime(\'now\') WHERE id = ?')
+      .run(label, existing.id);
+  } else {
+    db.prepare(`
+      INSERT INTO inventory (user_id, item_key, label, image_url, item_type)
+      VALUES (?, ?, ?, '/cards/kingofd.jpg', 'tournament_points')
+    `).run(userId, itemKey, label);
+  }
+  return { ok: true, total: totalPoints };
+}
+
+function getTournamentPointsPouch(userId) {
+  return db.prepare(`
+    SELECT id, item_key, label, image_url, item_type, earned_at
+    FROM inventory WHERE user_id = ? AND item_key = 'rec_tournament_points'
+  `).get(userId) || null;
 }
 
 function markProductsOwned(userId, products) {
@@ -342,6 +420,10 @@ module.exports = {
   markProductsOwned,
   purchaseWithCoins,
   grantAchievement,
+  grantBadge,
+  grantOrUpdateTournamentPointsPouch,
+  resolveTournamentCosmetics,
+  userCanUseStoreAsset,
   getPlayerShowcase,
   getGlobalDefaultProducts,
   getEquippedCardDeck,

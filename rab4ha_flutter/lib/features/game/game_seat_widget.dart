@@ -9,6 +9,42 @@ import 'game_controller.dart';
 import 'game_labels.dart';
 import 'turn_timer_ring.dart';
 
+/// شارة الموزّع — تظهر على مقعد اللاعب الذي وزّع الجولة الحالية.
+class DealerBadge extends StatelessWidget {
+  const DealerBadge({super.key, this.size = 20});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF6D976), Color(0xFFB8860B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: const Color(0xFF3A2A05), width: 1.2),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 3, offset: const Offset(0, 1)),
+        ],
+      ),
+      child: Text(
+        'D',
+        style: TextStyle(
+          color: const Color(0xFF2A1C02),
+          fontWeight: FontWeight.w900,
+          fontSize: size * 0.6,
+          height: 1,
+        ),
+      ),
+    );
+  }
+}
+
 /// P39 — 3 فتحات هدية فوق المقعد.
 class TableGiftSlots extends StatelessWidget {
   const TableGiftSlots({super.key, required this.slots});
@@ -156,9 +192,9 @@ class GameSeatWidget extends StatelessWidget {
                         PlayerAvatar(data: player, size: 48, vipFrame: true),
                         if (isDealer)
                           const Positioned(
-                            top: -4,
-                            right: -4,
-                            child: Text('🎯', style: TextStyle(fontSize: 12)),
+                            bottom: -6,
+                            right: -6,
+                            child: DealerBadge(),
                           ),
                       ],
                     ),
@@ -283,7 +319,8 @@ void showTableGiftFlow(BuildContext context, WidgetRef ref, GameController ctrl,
               },
             ),
             ...List.generate(4, (i) {
-              if (i == mySeat) return const SizedBox.shrink();
+              // المشاهد يهدي كل اللاعبين الأربعة؛ اللاعب لا يهدي نفسه
+              if (!game.isSpectator && i == mySeat) return const SizedBox.shrink();
               final seat = i < seats.length
                   ? Map<String, dynamic>.from(seats[i] as Map? ?? {})
                   : <String, dynamic>{};

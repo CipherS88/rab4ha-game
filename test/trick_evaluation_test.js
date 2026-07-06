@@ -120,7 +120,7 @@ function trickEngine(opts) {
   assert.deepStrictEqual(legal, [0]);
 }
 
-// ── إكة: فقاعة عند فتح أكلة في حكم (غير حكم، ليس آس، أقوى متبقٍ) ──
+// ── إكة: لا إعلان تلقائي — يدوي فقط ──
 {
   const e = new BalootEngine();
   e.phase = GamePhase.PLAYING;
@@ -131,10 +131,7 @@ function trickEngine(opts) {
   ];
   const card = { suit: 'HEARTS', rank: '10' };
   assert.strictEqual(e.is_akka(card), true);
-  const bubbles = e.getPlayChatBubbles(0, card);
-  assert.strictEqual(bubbles.length, 1);
-  assert.strictEqual(bubbles[0], 'اكه');
-  assert.strictEqual(e.getPlayChatBubbles(0, { suit: 'HEARTS', rank: 'A' }).length, 0);
+  assert.strictEqual(e.getPlayChatBubbles(0, card).length, 0);
 }
 
 // ── غش مسموح: ما دق بالحكم يُسجّل في mistakes ──

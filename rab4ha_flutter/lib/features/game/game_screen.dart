@@ -84,13 +84,14 @@ class GameScreen extends ConsumerWidget {
             game: game,
             sandbox: false,
             onLeave: () => _confirmLeave(context, ref, game.matchMode),
-            showBidPanel: _showBidPanel(game),
-            showProjectPanel: _showProjectBar(game),
+            showBidPanel: game.isSpectator ? false : _showBidPanel(game),
+            showProjectPanel: game.isSpectator ? false : _showProjectBar(game),
           ),
           if (game.soloMode) _SoloBanner(controlSeat: game.controlSeat),
+          if (game.isSpectator) const _SpectatorBanner(),
           if (game.dealingVisible) const DealingOverlay(),
-          ProjectSpreadsOverlay(game: game),
-          if (gs['sawa_declaration'] != null) SawaSpreadsOverlay(game: game),
+          if (!game.isSpectator) ProjectSpreadsOverlay(game: game),
+          if (gs['sawa_declaration'] != null && !game.isSpectator) SawaSpreadsOverlay(game: game),
           TrickCollectFlyLayer(),
           const TableGiftFlyOverlay(),
           if (game.tableGiftToast != null)
@@ -109,7 +110,28 @@ class GameScreen extends ConsumerWidget {
                 ),
               ),
             ),
-          if (game.qaidModalOpen || gs['qaid_session'] != null) QaidWizardOverlay(game: game),
+          if (game.ekkahToast != null)
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + (game.tableGiftToast != null ? 150 : 100),
+              left: 24,
+              right: 24,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF14532D),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF86EFAC)),
+                  ),
+                  child: Text(
+                    game.ekkahToast!,
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFBBF7D0)),
+                  ),
+                ),
+              ),
+            ),
+          if ((game.qaidModalOpen || gs['qaid_session'] != null) && !game.isSpectator)
+            QaidWizardOverlay(game: game),
           if (gs['phase'] == 'SCORE_SUMMARY' && gs['summary_data'] != null)
             _ScoreSummaryOverlay(game: game),
         ],
@@ -178,7 +200,6 @@ class GameScreen extends ConsumerWidget {
     final slots = game.tableGiftSlots ?? List.generate(4, (_) => []);
     final partnerSeat = (mySeat + 2) % 4;
     final sawaDecl = gs['sawa_declaration'] as Map?;
-    final sawaDeclarer = sawaDecl?['seat'] as int?;
 
     return visualPositions.map((pos) {
       final gSeat = getGlobalSeat(pos, mySeat);
@@ -227,10 +248,7 @@ class GameScreen extends ConsumerWidget {
             giftSlots: giftSlots,
             bubble: bubble,
             turnStartedAtMs: isTurn ? game.turnStartedAtMs : null,
-            showFan: !isBottom &&
-                (sawaDecl == null ||
-                    (gSeat != sawaDeclarer &&
-                        !isSawaOpponentSeat(gSeat, Map<String, dynamic>.from(sawaDecl)))),
+            showFan: !isBottom && sawaDecl == null,
             verticalFan: pos == 'left' || pos == 'right',
             fanAnchor: pos,
           ),
@@ -674,6 +692,46 @@ class _SoloBanner extends StatelessWidget {
   }
 }
 
+class _SpectatorBanner extends StatelessWidget {
+  const _SpectatorBanner();
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: MediaQuery.paddingOf(context).top + 44,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xE60F2619),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: const Color(0xFFD4AF37), width: 1.4),
+            boxShadow: const [
+              BoxShadow(color: Color(0x66D4AF37), blurRadius: 12),
+            ],
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.visibility, size: 15, color: Color(0xFFF0C96A)),
+              SizedBox(width: 6),
+              Text(
+                'وضع المشاهدة — يمكنك إرسال الهدايا فقط',
+                style: TextStyle(
+                  color: Color(0xFFF0C96A),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SideGameButton extends StatelessWidget {
   const _SideGameButton({
     required this.label,
@@ -681,6 +739,7 @@ class _SideGameButton extends StatelessWidget {
     required this.borderColor,
     required this.fillColor,
     this.enabled = true,
+    this.active = false,
   });
 
   final String label;
@@ -688,6 +747,7 @@ class _SideGameButton extends StatelessWidget {
   final Color borderColor;
   final Color fillColor;
   final bool enabled;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
@@ -701,8 +761,10 @@ class _SideGameButton extends StatelessWidget {
           child: Ink(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              color: fillColor.withValues(alpha: 0.88),
-              border: Border.all(color: borderColor, width: 2),
+              color: active
+                  ? borderColor.withValues(alpha: 0.35)
+                  : fillColor.withValues(alpha: 0.88),
+              border: Border.all(color: borderColor, width: active ? 3 : 2),
               boxShadow: [
                 BoxShadow(color: borderColor.withValues(alpha: 0.22), blurRadius: 10),
               ],
@@ -723,6 +785,25 @@ class _SideGameButton extends StatelessWidget {
   }
 }
 
+class _EkkahSideButton extends ConsumerWidget {
+  const _EkkahSideButton({required this.game});
+  final GameState game;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!game.canDeclareEkkah) return const SizedBox.shrink();
+    final ctrl = ref.read(gameControllerProvider.notifier);
+    return _SideGameButton(
+      label: 'إكة',
+      enabled: true,
+      active: game.ekkahToggle,
+      borderColor: const Color(0xFF86EFAC),
+      fillColor: const Color(0xFF166534),
+      onPressed: () => ctrl.toggleEkkah(),
+    );
+  }
+}
+
 class _SawaSideButton extends ConsumerWidget {
   const _SawaSideButton({required this.game});
   final GameState game;
@@ -730,7 +811,7 @@ class _SawaSideButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final gs = game.gs!;
-    if (gs['phase'] != 'PLAYING' || gs['qaid_session'] != null) {
+    if (game.isSpectator || gs['phase'] != 'PLAYING' || gs['qaid_session'] != null) {
       return const SizedBox.shrink();
     }
     final ctrl = ref.read(gameControllerProvider.notifier);
@@ -752,7 +833,7 @@ class _QaidSideButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final gs = game.gs!;
-    if (gs['phase'] != 'PLAYING' || gs['qaid_session'] != null) {
+    if (game.isSpectator || gs['phase'] != 'PLAYING' || gs['qaid_session'] != null) {
       return const SizedBox.shrink();
     }
     final ctrl = ref.read(gameControllerProvider.notifier);
@@ -1092,16 +1173,19 @@ class _LayoutGameScreen extends ConsumerWidget {
               handCount: oppHandCount > 0 ? oppHandCount : handCount,
             );
             if (ctx == null) return const [];
+            // أثناء السوا تُعرض كروت الجميع (خصوم + شريك) عبر طبقة الفرش — نُخفي المراوح المقلوبة
+            final sawaActive = gs['sawa_declaration'] != null;
             return [
-              slot(
-                seatPartId(pos, 'cards'),
-                OpponentHandFan(
-                  count: ctx.handCount,
-                  backUrl: ctx.backUrl,
-                  scale: resolved.tuning.opponentCardScale,
-                  overlapMul: resolved.tuning.opponentCardOverlap,
+              if (!sawaActive)
+                slot(
+                  seatPartId(pos, 'cards'),
+                  OpponentHandFan(
+                    count: ctx.handCount,
+                    backUrl: ctx.backUrl,
+                    scale: resolved.tuning.opponentCardScale,
+                    overlapMul: resolved.tuning.opponentCardOverlap,
+                  ),
                 ),
-              ),
               slot(
                 seatPartId(pos, 'avatar'),
                 Center(
@@ -1153,10 +1237,12 @@ class _LayoutGameScreen extends ConsumerWidget {
                   clipBehavior: Clip.none,
                   children: [
                     Positioned.fill(
-                      child: NetworkAssetImage(
-                        path: resolveSessionBgUrl(gs, game.room),
-                        fit: BoxFit.cover,
-                        errorWidget: CustomPaint(painter: _FeltPainter()),
+                      child: RepaintBoundary(
+                        child: NetworkAssetImage(
+                          path: resolveSessionBgUrl(gs, game.room),
+                          fit: BoxFit.cover,
+                          errorWidget: CustomPaint(painter: _FeltPainter()),
+                        ),
                       ),
                     ),
                     Positioned.fill(child: ColoredBox(color: Colors.black.withValues(alpha: 0.25))),
@@ -1208,6 +1294,7 @@ class _LayoutGameScreen extends ConsumerWidget {
                         sandbox ? const _SandboxBidPreview() : _BidPanel(game: game),
                       ),
                     if (showProject) slot('project_bar', _ProjectBar(game: game)),
+                    slot('btn_ekkah', _EkkahSideButton(game: game)),
                     slot('btn_sawa', _SawaSideButton(game: game)),
                     slot('btn_qaid', _QaidSideButton(game: game)),
                     slot('side_utils', FittedBox(fit: BoxFit.contain, child: _SideUtilityActions(game: game))),

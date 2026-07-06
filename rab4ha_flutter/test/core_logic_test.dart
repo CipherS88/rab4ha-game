@@ -42,4 +42,50 @@ void main() {
     expect(isQaidAllySeat(2, 0), isTrue);
     expect(isQaidAllySeat(1, 0), isFalse);
   });
+
+  test('qaidReasonsForRound — صن vs حكم', () {
+    final sunGs = {'bid': {'type': 'SUN'}, 'sawa_declaration': {}};
+    final hakamGs = {'bid': {'type': 'HAKAM'}, 'sawa_declaration': {}};
+    expect(qaidReasonsForRound(sunGs), ['قاطع', 'سوا غلط']);
+    expect(qaidReasonsForRound(hakamGs), qaidHakamReasons);
+    expect(qaidReasonsForRound({'bid': {'type': 'SUN'}}), ['قاطع']);
+  });
+
+  test('qaidReasonForWire — aliases إنجليزية', () {
+    expect(qaidReasonForWire('سوا غلط'), 'sawa_ghalat');
+    expect(qaidReasonForWire('إكة خاطئة'), 'wrong_ekkah');
+    expect(qaidReasonForWire('قاطع'), 'قاطع');
+    expect(qaidReasonFromWire('sawa_ghalat'), 'سوا غلط');
+    expect(qaidReasonFromWire('wrong_ekkah'), 'إكة خاطئة');
+  });
+
+  test('canSubmitQaid — مسار مباشر vs إثبات', () {
+    expect(
+      canSubmitQaid(reason: 'سوا غلط', cards: const [], submitting: false),
+      isTrue,
+    );
+    expect(
+      canSubmitQaid(reason: 'إكة خاطئة', cards: const [], submitting: false),
+      isTrue,
+    );
+    expect(
+      canSubmitQaid(reason: 'قاطع', cards: const [], submitting: false),
+      isFalse,
+    );
+    expect(
+      canSubmitQaid(
+        reason: 'قاطع',
+        cards: const [
+          {'suit': 'A', 'rank': 'A'},
+          {'suit': 'B', 'rank': 'K'},
+        ],
+        submitting: false,
+      ),
+      isTrue,
+    );
+    expect(
+      canSubmitQaid(reason: 'سوا غلط', cards: const [], submitting: true),
+      isFalse,
+    );
+  });
 }
